@@ -1,0 +1,60 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-app-bg: #0b141a;
+  --color-panel: #111b21;
+  --color-panel-2: #202c33;
+  --color-bubble-in: #202c33;
+  --color-bubble-out: #005c4b;
+  --color-accent: #00a884;
+  --color-muted: #8696a0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-app-bg);
+  color: #e9edef;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Respect mobile safe areas (notches / home indicator). */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Subtle scrollbar that matches the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #374045 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #374045;
+  border-radius: 9999px;
+}
+
+/* Amplify Authenticator dark theme overrides. */
+[data-amplify-authenticator] {
+  --amplify-colors-background-primary: var(--color-panel);
+  --amplify-colors-background-secondary: var(--color-panel-2);
+  --amplify-colors-font-primary: #e9edef;
+  --amplify-colors-font-secondary: var(--color-muted);
+  --amplify-colors-brand-primary-80: var(--color-accent);
+  --amplify-colors-brand-primary-90: var(--color-accent);
+  --amplify-colors-brand-primary-100: var(--color-accent);
+  --amplify-components-button-primary-background-color: var(--color-accent);
+  --amplify-components-tabs-item-active-color: var(--color-accent);
+  --amplify-components-tabs-item-focus-color: var(--color-accent);
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+}

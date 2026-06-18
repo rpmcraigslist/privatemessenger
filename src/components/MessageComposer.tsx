@@ -1,0 +1,174 @@
+import { useRef, useState } from 'react';
+import { uploadData } from 'aws-amplify/storage';
+import { client, type ConversationModel } from '../lib/amplify';
+import { formatBytes } from '../lib/util';
+
+type Props = {
+  conversation: ConversationModel;
+  myUsername: string;
+};
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB guardrail.
+
+export default function MessageComposer({ conversation, myUsername }: Props) {
+  const [text, setText] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const canSend = (text.trim().length > 0 || file != null) && !sending;
+
+  function pickFile(selected: File | null) {
+    setError(null);
+    if (selected && selected.size > MAX_FILE_BYTES) {
+      setError(`File too large (max ${formatBytes(MAX_FILE_BYTES)}).`);
+      return;
+    }
+    setFile(selected);
+  }
+
+  async function send() {
+    if (!canSend) return;
+    setSending(true);
+    setError(null);
+    const body = text.trim();
+    try {
+      let attachmentKey: string | undefined;
+      let attachmentName: string | undefined;
+      let type: 'text' | 'image' | 'file' = 'text';
+
+      if (file) {
+        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+        const result = await uploadData({
+          path: ({ identityId }) =>
+            `conversations/${conversation.id}/${identityId}/${Date.now()}-${safeName}`,
+          data: file,
+          options: { contentType: file.type || 'application/octet-stream' },
+        }).result;
+        attachmentKey = result.path;
+        attachmentName = file.name;
+        type = file.type.startsWith('image/') ? 'image' : 'file';
+      }
+
+      const participantUsernames = conversation.participants.filter(
+        (p): p is string => !!p,
+      );
+
+      const { data: created } = await client.models.Message.create({
+        conversationId: conversation.id,
+        content: body || undefined,
+        senderUsername: myUsername,
+        participantUsernames,
+        type,
+        attachmentKey,
+        attachmentName,
+      });
+
+      if (created?.id) {
+        void client.mutations
+          .sendMessageAlerts({ messageId: created.id })
+          .catch((err) => console.error('message alert failed', err));
+      }
+
+      const preview =
+        body || (type === 'image' ? '📷 Photo' : `📎 ${attachmentName}`);
+      await client.models.Conversation.update({
+        id: conversation.id,
+        lastMessage: preview.slice(0, 120),
+        lastMessageAt: new Date().toISOString(),
+      });
+
+      setText('');
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      console.error('failed to send message', err);
+      setError('Failed to send. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void send();
+    }
+  }
+
+  return (
+    <div className="border-t border-black/30 bg-[var(--color-panel)] px-3 py-2.5">
+      {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+      {file && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm">
+          <span className="truncate">{file.name}</span>
+          <span className="shrink-0 text-xs text-[var(--color-muted)]">
+            {formatBytes(file.size)}
+          </span>
+          <button
+            onClick={() => pickFile(null)}
+            className="ml-auto text-[var(--color-muted)] hover:text-white"
+            aria-label="Remove attachment"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-end gap-2">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-muted)] transition hover:bg-white/10 hover:text-white"
+          title="Attach"
+          aria-label="Attach file"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L10 17.4a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+        />
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+          rows={1}
+          placeholder="Type a message"
+          className="max-h-32 min-h-10 flex-1 resize-none rounded-2xl bg-[var(--color-panel-2)] px-4 py-2.5 text-[15px] outline-none placeholder:text-[var(--color-muted)]"
+        />
+
+        <button
+          onClick={() => void send()}
+          disabled={!canSend}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-40"
+          style={{ background: 'var(--color-accent)' }}
+          title="Send"
+          aria-label="Send message"
+        >
+          {sending ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 12 20 4l-4 16-4-7-8-1Z"
+                fill="currentColor"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}

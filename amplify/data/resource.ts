@@ -1,0 +1,200 @@
+import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { attachmentUrl } from '../functions/attachment-url/resource';
+import { bootstrapRequired } from '../functions/bootstrap-required/resource';
+import { bootstrapAdmin } from '../functions/bootstrap-admin/resource';
+import { adminOps } from '../functions/admin-ops/resource';
+import { messageAlerts } from '../functions/message-alerts/resource';
+import { profileSync } from '../functions/profile-sync/resource';
+
+const schema = a
+  .schema({
+    UserProfile: a
+      .model({
+        username: a.string().required(),
+        cognitoSub: a.string(),
+        displayName: a.string(),
+        avatarColor: a.string(),
+        role: a.enum(['admin', 'user']),
+        phoneNumber: a.string(),
+      })
+      .secondaryIndexes((index) => [index('username'), index('cognitoSub')])
+      .authorization((allow) => [
+        allow.authenticated().to(['read']),
+        allow.owner().to(['create', 'update', 'delete', 'read']),
+      ]),
+
+    Conversation: a
+      .model({
+        name: a.string(),
+        isGroup: a.boolean().default(false),
+        participants: a.string().array().required(),
+        lastMessage: a.string(),
+        lastMessageAt: a.datetime(),
+        messages: a.hasMany('Message', 'conversationId'),
+      })
+      .authorization((allow) => [
+        allow
+          .ownersDefinedIn('participants')
+          .identityClaim('sub')
+          .to(['read', 'create', 'update', 'delete']),
+      ]),
+
+    Message: a
+      .model({
+        conversationId: a.id().required(),
+        conversation: a.belongsTo('Conversation', 'conversationId'),
+        content: a.string(),
+        senderUsername: a.string().required(),
+        participantUsernames: a.string().array().required(),
+        type: a.enum(['text', 'image', 'file']),
+        attachmentKey: a.string(),
+        attachmentName: a.string(),
+      })
+      .secondaryIndexes((index) => [index('conversationId')])
+      .authorization((allow) => [
+        allow
+          .ownersDefinedIn('participantUsernames')
+          .identityClaim('sub')
+          .to(['read', 'create']),
+      ]),
+
+    AdminUser: a.customType({
+      loginId: a.string().required(),
+      username: a.string().required(),
+      phoneNumber: a.string(),
+      status: a.string().required(),
+    }),
+
+    BootstrapResult: a.customType({
+      username: a.string().required(),
+      message: a.string().required(),
+    }),
+
+    AdminCreateUserResult: a.customType({
+      username: a.string().required(),
+      forcePasswordChange: a.boolean().required(),
+    }),
+
+    AdminDeleteUserResult: a.customType({
+      username: a.string().required(),
+    }),
+
+    AdminPurgeUsersResult: a.customType({
+      deleted: a.integer().required(),
+    }),
+
+    AdminClearMessagesResult: a.customType({
+      deletedMessages: a.integer().required(),
+      deletedConversations: a.integer().required(),
+    }),
+
+    MessageAlertsResult: a.customType({
+      sent: a.integer().required(),
+      conversationId: a.string(),
+    }),
+
+    SyncProfileResult: a.customType({
+      profileId: a.string().required(),
+      username: a.string().required(),
+      cognitoSub: a.string().required(),
+      role: a.string().required(),
+    }),
+
+    bootstrapRequired: a
+      .query()
+      .returns(a.boolean())
+      .authorization((allow) => [allow.publicApiKey()])
+      .handler(a.handler.function(bootstrapRequired)),
+
+    bootstrapAdmin: a
+      .mutation()
+      .arguments({
+        username: a.string().required(),
+        password: a.string().required(),
+        phoneNumber: a.string(),
+      })
+      .returns(a.ref('BootstrapResult'))
+      .authorization((allow) => [allow.publicApiKey()])
+      .handler(a.handler.function(bootstrapAdmin)),
+
+    adminListUsers: a
+      .query()
+      .returns(a.ref('AdminUser').array())
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminCreateUser: a
+      .mutation()
+      .arguments({
+        username: a.string().required(),
+        temporaryPassword: a.string().required(),
+        phoneNumber: a.string(),
+        forcePasswordChange: a.boolean(),
+      })
+      .returns(a.ref('AdminCreateUserResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminDeleteUser: a
+      .mutation()
+      .arguments({ username: a.string().required() })
+      .returns(a.ref('AdminDeleteUserResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminPurgeUsers: a
+      .mutation()
+      .returns(a.ref('AdminPurgeUsersResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminClearMessages: a
+      .mutation()
+      .returns(a.ref('AdminClearMessagesResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    sendMessageAlerts: a
+      .mutation()
+      .arguments({ messageId: a.id().required() })
+      .returns(a.ref('MessageAlertsResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(messageAlerts)),
+
+    syncMyProfile: a
+      .mutation()
+      .arguments({ phoneNumber: a.string() })
+      .returns(a.ref('SyncProfileResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(profileSync)),
+
+    getAttachmentUrl: a
+      .query()
+      .arguments({
+        conversationId: a.id().required(),
+        attachmentKey: a.string().required(),
+      })
+      .returns(a.string())
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(attachmentUrl)),
+  })
+  .authorization((allow) => [
+    allow.resource(attachmentUrl),
+    allow.resource(bootstrapRequired),
+    allow.resource(bootstrapAdmin),
+    allow.resource(adminOps),
+    allow.resource(messageAlerts),
+    allow.resource(profileSync),
+  ]);
+
+export type Schema = ClientSchema<typeof schema>;
+
+export const data = defineData({
+  schema,
+  authorizationModes: {
+    defaultAuthorizationMode: 'userPool',
+    apiKeyAuthorizationMode: {
+      expiresInDays: 30,
+    },
+  },
+});

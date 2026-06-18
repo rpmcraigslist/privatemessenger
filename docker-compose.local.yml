@@ -1,0 +1,56 @@
+# Local-only stack: React UI + LocalStack (S3 + DynamoDB).
+#
+# This does NOT run the full messenger offline. LocalStack Community Edition
+# does not emulate Cognito User Pools or AppSync subscriptions in a way that
+# Amplify Gen 2 can use without major rewrites.
+#
+# What you CAN do locally:
+#   - Run the React UI at http://localhost:5173
+#   - Inspect LocalStack S3/DynamoDB at http://localhost:4566
+#   - Learn AWS APIs without touching a real account
+#
+# What you CANNOT do locally (without AWS):
+#   - Sign up / sign in (Cognito)
+#   - Real-time chat (AppSync WebSockets)
+#
+# Full messenger (recommended):
+#   1. Create a free AWS account + IAM access keys (see docs/AWS-GETTING-STARTED.md)
+#   2. aws configure
+#   3. npm run sandbox   (or: docker compose --profile aws up)
+#   4. npm run docker:dev  (or npm run dev)
+
+services:
+  localstack:
+    image: localstack/localstack:4.4
+    ports:
+      - '4566:4566'
+    environment:
+      SERVICES: s3,dynamodb
+      DEBUG: '0'
+      PERSISTENCE: '1'
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./docker/localstack/init.sh:/etc/localstack/init/ready.d/init.sh:ro
+
+  web:
+    build:
+      context: .
+      target: dev
+    ports:
+      - '5173:5173'
+    volumes:
+      - .:/app
+      - web_node_modules:/app/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: 'true'
+      # Point AWS CLI/SDK at LocalStack when experimenting (optional).
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    depends_on:
+      - localstack
+
+volumes:
+  localstack_data:
+  web_node_modules:

@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import {
-  client,
-  type ConversationModel,
-  type UserProfileModel,
-} from '../lib/amplify';
-
+import { client, type ConversationModel, type UserProfileModel } from '../lib/amplify';
+import { loadUserDirectory } from '../lib/directory';
 import {
   displayName,
-  dedupeUserProfiles,
   graphqlErrorMessage,
   isValidUsername,
   normalizeUsername,
@@ -50,10 +45,8 @@ export default function NewChatModal({
 
     (async () => {
       try {
-        const res = await client.models.UserProfile.list();
-        setDirectory(
-          dedupeUserProfiles(res.data).filter((p) => p.username !== myUsername),
-        );
+        const profiles = await loadUserDirectory();
+        setDirectory(profiles.filter((p) => p.username !== myUsername));
       } catch (err) {
         console.error('failed to load directory', err);
       }

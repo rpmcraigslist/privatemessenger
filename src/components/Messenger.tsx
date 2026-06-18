@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { client, type ConversationModel } from '../lib/amplify';
+import { loadUserDirectory } from '../lib/directory';
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
-import { dedupeUserProfiles } from '../lib/util';
 import ConversationList from './ConversationList';
 import ChatView from './ChatView';
 import NewChatModal from './NewChatModal';
@@ -48,9 +48,9 @@ export default function Messenger({ onSignOut }: Props) {
     if (!user) return;
     void (async () => {
       try {
-        const res = await client.models.UserProfile.list();
+        const profiles = await loadUserDirectory();
         const map = new Map<string, string>();
-        for (const p of dedupeUserProfiles(res.data)) {
+        for (const p of profiles) {
           if (p.cognitoSub) map.set(p.cognitoSub, p.username);
         }
         setSubToUsername(map);

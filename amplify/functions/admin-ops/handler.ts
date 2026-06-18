@@ -57,6 +57,41 @@ function mapUser(u: UserType) {
   };
 }
 
+async function listUserDirectory() {
+  const client = await dataClientPromise;
+  const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
+  return profiles.data.map((p) => ({
+    id: p.id,
+    username: p.username,
+    cognitoSub: p.cognitoSub ?? null,
+    displayName: p.displayName ?? p.username,
+    avatarColor: p.avatarColor ?? null,
+  }));
+}
+
+async function ensureProfileStub(
+  handle: string,
+  phoneNumber?: string | null,
+): Promise<void> {
+  const client = await dataClientPromise;
+  const existing = await client.models.UserProfile.list({
+    filter: { username: { eq: handle } },
+    authMode: 'iam',
+  });
+  if (existing.data.length > 0) return;
+
+  await client.models.UserProfile.create(
+    {
+      username: handle,
+      displayName: handle,
+      role: 'user',
+      phoneNumber: phoneNumber?.trim() || null,
+      avatarColor: '#64b5f6',
+    },
+    { authMode: 'iam' },
+  );
+}
+
 async function listUsers() {
   const users: ReturnType<typeof mapUser>[] = [];
   let token: string | undefined;
@@ -100,6 +135,13 @@ function resolveFieldName(event: unknown): string {
 export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
   async (event) => {
   const field = resolveFieldName(event);
+
+  if (field === 'listUserDirectory') {
+    const { username } = parseIdentity(event.identity);
+    if (!username) throw new Error('Unauthorized');
+    return listUserDirectory();
+  }
+
   const actor = await assertAdmin(event.identity);
 
   switch (field) {
@@ -145,6 +187,8 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
           }),
         );
       }
+
+      await ensureProfileStub(handle, phoneNumber);
 
       return {
         username: handle,

@@ -19,8 +19,9 @@ const schema = a
       })
       .secondaryIndexes((index) => [index('username'), index('cognitoSub')])
       .authorization((allow) => [
+        // Directory reads go through listUserDirectory (Lambda + IAM).
+        // Profile rows are created/updated only by backend Lambdas.
         allow.authenticated().to(['read']),
-        allow.owner().to(['create', 'update', 'delete', 'read']),
       ]),
 
     Conversation: a
@@ -100,6 +101,14 @@ const schema = a
       role: a.string().required(),
     }),
 
+    DirectoryUser: a.customType({
+      id: a.string().required(),
+      username: a.string().required(),
+      cognitoSub: a.string(),
+      displayName: a.string(),
+      avatarColor: a.string(),
+    }),
+
     bootstrapRequired: a
       .query()
       .returns(a.boolean())
@@ -116,6 +125,12 @@ const schema = a
       .returns(a.ref('BootstrapResult'))
       .authorization((allow) => [allow.publicApiKey()])
       .handler(a.handler.function(bootstrapAdmin)),
+
+    listUserDirectory: a
+      .query()
+      .returns(a.ref('DirectoryUser').array())
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
 
     adminListUsers: a
       .query()

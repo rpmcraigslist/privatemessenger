@@ -313,6 +313,100 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** One-line preview for conversation list rows. */
+export function messageListPreview(message: {
+  content?: string | null;
+  type?: string | null;
+  attachmentName?: string | null;
+}): string {
+  const body = message.content?.trim();
+  if (body) return body.slice(0, 120);
+  if (message.type === 'image') return '📷 Photo';
+  if (message.attachmentName) return `📎 ${message.attachmentName}`.slice(0, 120);
+  return '📎 Attachment';
+}
+
+const REPLY_PREVIEW_MAX = 200;
+
+/** Truncated text shown when quoting a message in a reply. */
+export function messageReplyPreview(message: {
+  content?: string | null;
+  type?: string | null;
+  attachmentName?: string | null;
+}): string {
+  return messageListPreview(message).slice(0, REPLY_PREVIEW_MAX);
+}
+
+export function messageMatchesSearch(
+  message: {
+    content?: string | null;
+    attachmentName?: string | null;
+    replyToContentPreview?: string | null;
+  },
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return false;
+  const haystack = [
+    message.content,
+    message.attachmentName,
+    message.replyToContentPreview,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+export function splitBySearchQuery(
+  text: string,
+  query: string,
+): { text: string; highlight: boolean }[] {
+  const q = query.trim();
+  if (!q) return [{ text, highlight: false }];
+
+  const lower = text.toLowerCase();
+  const qLower = q.toLowerCase();
+  const parts: { text: string; highlight: boolean }[] = [];
+  let start = 0;
+  let idx = lower.indexOf(qLower, start);
+
+  while (idx !== -1) {
+    if (idx > start) {
+      parts.push({ text: text.slice(start, idx), highlight: false });
+    }
+    parts.push({ text: text.slice(idx, idx + q.length), highlight: true });
+    start = idx + q.length;
+    idx = lower.indexOf(qLower, start);
+  }
+
+  if (start < text.length) {
+    parts.push({ text: text.slice(start), highlight: false });
+  }
+
+  return parts.length > 0 ? parts : [{ text, highlight: false }];
+}
+
+export type ReplyTarget = {
+  messageId: string;
+  senderUsername: string;
+  contentPreview: string;
+};
+
+export function replyTargetFromMessage(message: {
+  id: string;
+  senderUsername: string;
+  content?: string | null;
+  type?: string | null;
+  attachmentName?: string | null;
+}): ReplyTarget {
+  return {
+    messageId: message.id,
+    senderUsername: message.senderUsername,
+    contentPreview: messageReplyPreview(message),
+  };
+}
+
 export function conversationTitle(
   participants: (string | null)[],
   name: string | null | undefined,

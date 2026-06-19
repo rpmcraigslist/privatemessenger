@@ -3,7 +3,7 @@ import { client, type ConversationModel } from '../lib/amplify';
 import { loadUserDirectory } from '../lib/directory';
 import { fetchUnreadCount, getLastReadAt } from '../lib/read-state';
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
-import { buildParticipantDirectory } from '../lib/util';
+import { buildParticipantDirectory, messageListPreview } from '../lib/util';
 import ConversationList from './ConversationList';
 import ChatView from './ChatView';
 import NewChatModal from './NewChatModal';
@@ -13,6 +13,22 @@ import ProfileSettings from './ProfileSettings';
 type Props = {
   onSignOut: () => void;
 };
+
+type LatestMessagePreview = {
+  preview: string;
+  at: string;
+};
+
+function conversationActivityAt(
+  conversation: ConversationModel,
+  latestByConversation: Map<string, LatestMessagePreview>,
+): string {
+  return (
+    latestByConversation.get(conversation.id)?.at ??
+    conversation.lastMessageAt ??
+    conversation.createdAt
+  );
+}
 
 export default function Messenger({ onSignOut }: Props) {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -29,6 +45,9 @@ export default function Messenger({ onSignOut }: Props) {
   const [subToUsername, setSubToUsername] = useState<Map<string, string>>(
     () => new Map(),
   );
+  const [latestByConversation, setLatestByConversation] = useState<
+    Map<string, LatestMessagePreview>
+  >(() => new Map());
 
   useEffect(() => {
     let active = true;
@@ -66,12 +85,7 @@ export default function Messenger({ onSignOut }: Props) {
     setLoading(true);
     const sub = client.models.Conversation.observeQuery().subscribe({
       next: ({ items }) => {
-        const sorted = [...items].sort(
-          (a, b) =>
-            new Date(b.lastMessageAt ?? b.createdAt).getTime() -
-            new Date(a.lastMessageAt ?? a.createdAt).getTime(),
-        );
-        setConversations(sorted);
+        setConversations(items);
         setLoading(false);
       },
       error: (err) => {
@@ -81,6 +95,44 @@ export default function Messenger({ onSignOut }: Props) {
     });
     return () => sub.unsubscribe();
   }, [user?.username]);
+
+  useEffect(() => {
+    if (!user) return;
+    const sub = client.models.Message.observeQuery().subscribe({
+      next: ({ items }) => {
+        const next = new Map<string, LatestMessagePreview>();
+        for (const message of items) {
+          if (!message.conversationId) continue;
+          const current = next.get(message.conversationId);
+          if (
+            current &&
+            new Date(current.at).getTime() >= new Date(message.createdAt).getTime()
+          ) {
+            continue;
+          }
+          next.set(message.conversationId, {
+            preview: messageListPreview(message),
+            at: message.createdAt,
+          });
+        }
+        setLatestByConversation(next);
+      },
+      error: (err) => {
+        console.error('message preview subscription error', err);
+      },
+    });
+    return () => sub.unsubscribe();
+  }, [user?.cognitoSub]);
+
+  const conversationsForList = useMemo(
+    () =>
+      [...conversations].sort(
+        (a, b) =>
+          new Date(conversationActivityAt(b, latestByConversation)).getTime() -
+          new Date(conversationActivityAt(a, latestByConversation)).getTime(),
+      ),
+    [conversations, latestByConversation],
+  );
 
   const refreshUnreadCounts = useCallback(async () => {
     if (!user) return;
@@ -147,7 +199,8 @@ export default function Messenger({ onSignOut }: Props) {
           mySub={user.cognitoSub}
           subToUsername={subToUsername}
           isAdmin={user.isAdmin}
-          conversations={conversations}
+          conversations={conversationsForList}
+          latestByConversation={latestByConversation}
           selectedId={selectedId}
           loading={loading}
           unreadCounts={unreadCounts}

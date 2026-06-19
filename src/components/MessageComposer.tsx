@@ -1,21 +1,44 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { uploadData } from 'aws-amplify/storage';
 import { client, type ConversationModel } from '../lib/amplify';
-import { formatBytes } from '../lib/util';
+import {
+  formatBytes,
+  messageListPreview,
+  participantDisplayName,
+  type ReplyTarget,
+} from '../lib/util';
 
 type Props = {
   conversation: ConversationModel;
   myUsername: string;
+  subToUsername: Map<string, string>;
+  replyTo?: ReplyTarget | null;
+  onCancelReply?: () => void;
+  onSent?: () => void;
 };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB guardrail.
 
-export default function MessageComposer({ conversation, myUsername }: Props) {
+export default function MessageComposer({
+  conversation,
+  myUsername,
+  subToUsername,
+  replyTo,
+  onCancelReply,
+  onSent,
+}: Props) {
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (replyTo) {
+      textareaRef.current?.focus();
+    }
+  }, [replyTo]);
 
   const canSend = (text.trim().length > 0 || file != null) && !sending;
 
@@ -63,6 +86,13 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
         type,
         attachmentKey,
         attachmentName,
+        ...(replyTo
+          ? {
+              replyToMessageId: replyTo.messageId,
+              replyToSenderUsername: replyTo.senderUsername,
+              replyToContentPreview: replyTo.contentPreview,
+            }
+          : {}),
       });
 
       if (created?.id) {
@@ -81,8 +111,11 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
         }
       }
 
-      const preview =
-        body || (type === 'image' ? '📷 Photo' : `📎 ${attachmentName}`);
+      const preview = messageListPreview({
+        content: body,
+        type,
+        attachmentName,
+      });
       await client.models.Conversation.update({
         id: conversation.id,
         lastMessage: preview.slice(0, 120),
@@ -92,6 +125,8 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
       setText('');
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      onCancelReply?.();
+      onSent?.();
     } catch (err) {
       console.error('failed to send message', err);
       setError('Failed to send. Please try again.');
@@ -105,11 +140,38 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
       e.preventDefault();
       void send();
     }
+    if (e.key === 'Escape' && replyTo) {
+      e.preventDefault();
+      onCancelReply?.();
+    }
   }
 
   return (
     <div className="border-t border-black/30 bg-[var(--color-panel)] px-3 py-2.5">
       {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+
+      {replyTo && (
+        <div className="mb-2 flex items-start gap-2 rounded-lg border-l-4 border-[var(--color-accent)] bg-[var(--color-panel-2)] px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-[var(--color-accent)]">
+              Replying to{' '}
+              {participantDisplayName(replyTo.senderUsername, subToUsername)}
+            </p>
+            <p className="truncate text-sm text-[var(--color-muted)]">
+              {replyTo.contentPreview}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="shrink-0 text-[var(--color-muted)] hover:text-white"
+            aria-label="Cancel reply"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {file && (
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm">
           <span className="truncate">{file.name}</span>
@@ -151,11 +213,12 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
         />
 
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           rows={1}
-          placeholder="Type a message"
+          placeholder={replyTo ? 'Type your reply' : 'Type a message'}
           className="max-h-32 min-h-10 flex-1 resize-none rounded-2xl bg-[var(--color-panel-2)] px-4 py-2.5 text-[15px] outline-none placeholder:text-[var(--color-muted)]"
         />
 

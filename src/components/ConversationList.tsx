@@ -9,6 +9,7 @@ type Props = {
   subToUsername: Map<string, string>;
   isAdmin: boolean;
   conversations: ConversationModel[];
+  latestByConversation: Map<string, { preview: string; at: string }>;
   selectedId: string | null;
   loading: boolean;
   unreadCounts: Map<string, number>;
@@ -25,6 +26,7 @@ export default function ConversationList({
   subToUsername,
   isAdmin,
   conversations,
+  latestByConversation,
   selectedId,
   loading,
   unreadCounts,
@@ -175,6 +177,10 @@ export default function ConversationList({
             );
             const active = c.id === selectedId;
             const unread = unreadCounts.get(c.id) ?? 0;
+            const latest = latestByConversation.get(c.id);
+            const previewText =
+              latest?.preview ?? c.lastMessage ?? 'Tap to start chatting';
+            const previewTime = latest?.at ?? c.lastMessageAt;
             return (
               <button
                 key={c.id}
@@ -203,13 +209,13 @@ export default function ConversationList({
                       {title}
                     </span>
                     <span className="shrink-0 text-xs text-[var(--color-muted)]">
-                      {formatListTime(c.lastMessageAt)}
+                      {formatListTime(previewTime)}
                     </span>
                   </div>
                   <p
                     className={`truncate text-sm ${unread > 0 ? 'font-medium text-white' : 'text-[var(--color-muted)]'}`}
                   >
-                    {c.lastMessage || 'Tap to start chatting'}
+                    {previewText}
                   </p>
                 </div>
               </button>

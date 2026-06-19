@@ -51,6 +51,9 @@ const schema = a
         type: a.enum(['text', 'image', 'file']),
         attachmentKey: a.string(),
         attachmentName: a.string(),
+        replyToMessageId: a.id(),
+        replyToSenderUsername: a.string(),
+        replyToContentPreview: a.string(),
       })
       .secondaryIndexes((index) => [index('conversationId')])
       .authorization((allow) => [

@@ -12,6 +12,7 @@ import {
 } from '../shared/profiles';
 
 type Handler = Schema['sendMessageAlerts']['functionHandler'];
+type DataClient = ReturnType<typeof generateClient<Schema>>;
 type MessageModel = Schema['Message']['type'];
 
 const sns = new SNSClient({});
@@ -40,7 +41,7 @@ function loginUrl(appUrl?: string | null): string {
 }
 
 async function loadMessage(
-  client: Awaited<typeof dataClientPromise>,
+  client: DataClient,
   messageId: string,
 ): Promise<MessageModel | null> {
   for (let attempt = 0; attempt < 5; attempt += 1) {

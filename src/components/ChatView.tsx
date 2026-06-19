@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 import { getLastReadAt, markConversationRead } from '../lib/read-state';
 import {
@@ -22,6 +22,9 @@ type Props = {
   onConversationUpdated: () => void;
 };
 
+/** flex-col-reverse keeps new messages at the visual bottom without scrollTop hacks. */
+const SCROLL_AT_BOTTOM_THRESHOLD_PX = 96;
+
 export default function ChatView({
   conversation,
   myUsername,
@@ -31,12 +34,13 @@ export default function ChatView({
   onConversationUpdated,
 }: Props) {
   const [messages, setMessages] = useState<MessageModel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [synced, setSynced] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const onConversationUpdatedRef = useRef(onConversationUpdated);
   onConversationUpdatedRef.current = onConversationUpdated;
+  const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const title = conversationTitle(
     conversation.participants,
@@ -46,72 +50,82 @@ export default function ChatView({
     subToUsername,
   );
 
-  const scrollToBottom = useCallback(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-    container.scrollTop = container.scrollHeight;
-  }, []);
-
-  const markRead = useCallback(
+  const scheduleMarkRead = useCallback(
     (items: MessageModel[]) => {
-      const last = items[items.length - 1];
-      if (!last) return;
-      const previous = getLastReadAt(mySub, conversation.id);
-      if (previous === last.createdAt) return;
-      markConversationRead(mySub, conversation.id, last.createdAt);
-      onConversationUpdatedRef.current();
+      if (markReadTimerRef.current) {
+        clearTimeout(markReadTimerRef.current);
+      }
+      markReadTimerRef.current = setTimeout(() => {
+        const last = items[items.length - 1];
+        if (!last) return;
+        const previous = getLastReadAt(mySub, conversation.id);
+        if (previous === last.createdAt) return;
+        markConversationRead(mySub, conversation.id, last.createdAt);
+        onConversationUpdatedRef.current();
+      }, 400);
     },
     [conversation.id, mySub],
   );
 
   useEffect(() => {
     stickToBottomRef.current = true;
-    setLoading(true);
+    setMessages([]);
+    setSynced(false);
+
     const sub = client.models.Message.observeQuery({
       filter: { conversationId: { eq: conversation.id } },
     }).subscribe({
-      next: ({ items }) => {
+      next: ({ items, isSynced }) => {
         const sorted = [...items].sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         );
         setMessages(sorted);
-        setLoading(false);
-        markRead(sorted);
+        setSynced(isSynced);
+        if (isSynced) {
+          scheduleMarkRead(sorted);
+        }
       },
       error: (err) => {
         console.error('message subscription error', err);
-        setLoading(false);
+        setSynced(true);
       },
     });
-    return () => sub.unsubscribe();
-  }, [conversation.id, markRead]);
+
+    return () => {
+      sub.unsubscribe();
+      if (markReadTimerRef.current) {
+        clearTimeout(markReadTimerRef.current);
+      }
+    };
+  }, [conversation.id, scheduleMarkRead]);
 
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
 
     const onScroll = () => {
-      const distanceFromBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight;
-      stickToBottomRef.current = distanceFromBottom < 96;
+      // In a column-reverse scroller, scrollTop 0 is the visual bottom.
+      stickToBottomRef.current =
+        container.scrollTop <= SCROLL_AT_BOTTOM_THRESHOLD_PX;
     };
 
     container.addEventListener('scroll', onScroll, { passive: true });
     return () => container.removeEventListener('scroll', onScroll);
   }, [conversation.id]);
 
-  const tailMessage = messages[messages.length - 1];
-  const scrollTrigger = tailMessage
-    ? `${messages.length}:${tailMessage.id}:${tailMessage.createdAt}`
-    : `${messages.length}:empty`;
+  const showInitialLoading = !synced && messages.length === 0;
+  const showEmpty = synced && messages.length === 0;
+  const messagesNewestFirst = useMemo(
+    () => [...messages].reverse(),
+    [messages],
+  );
 
-  useEffect(() => {
-    if (loading || !stickToBottomRef.current) return;
-    requestAnimationFrame(() => {
-      scrollToBottom();
-    });
-  }, [conversation.id, loading, scrollTrigger, scrollToBottom]);
+  const pinToBottom = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container || !stickToBottomRef.current) return;
+    container.scrollTop = 0;
+  }, []);
 
   return (
     <>
@@ -156,32 +170,33 @@ export default function ChatView({
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-12"
+        className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto px-3 py-4 md:px-12"
         style={{
           backgroundColor: 'var(--color-app-bg)',
           backgroundImage:
             'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)',
           backgroundSize: '22px 22px',
+          overflowAnchor: 'none',
         }}
       >
-        {loading ? (
+        {showInitialLoading ? (
           <p className="py-6 text-center text-sm text-[var(--color-muted)]">
             Loading messages…
           </p>
-        ) : messages.length === 0 ? (
+        ) : showEmpty ? (
           <p className="py-6 text-center text-sm text-[var(--color-muted)]">
             No messages yet. Say hello!
           </p>
         ) : (
-          <div className="mx-auto flex max-w-2xl flex-col gap-1.5">
-            {messages.map((m, i) => {
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-1.5">
+            {messagesNewestFirst.map((m, i) => {
               const mine = isSameMessengerUser(
                 m.senderUsername,
                 myUsername,
                 mySub,
                 subToUsername,
               );
-              const prev = messages[i - 1];
+              const prev = messagesNewestFirst[i + 1];
               const showSender =
                 !mine &&
                 conversation.participants.length > 2 &&
@@ -197,10 +212,10 @@ export default function ChatView({
                   mine={mine}
                   showSender={showSender}
                   subToUsername={subToUsername}
+                  onLayout={pinToBottom}
                 />
               );
             })}
-            <div aria-hidden="true" />
           </div>
         )}
       </div>
@@ -229,11 +244,13 @@ function Bubble({
   mine,
   showSender,
   subToUsername,
+  onLayout,
 }: {
   message: MessageModel;
   mine: boolean;
   showSender: boolean;
   subToUsername: Map<string, string>;
+  onLayout?: () => void;
 }) {
   return (
     <div className={`flex ${mine ? 'justify-start' : 'justify-end'}`}>
@@ -259,6 +276,7 @@ function Bubble({
             path={message.attachmentKey}
             name={message.attachmentName ?? 'file'}
             isImage={message.type === 'image'}
+            onLoad={onLayout}
           />
         )}
         {message.content && (

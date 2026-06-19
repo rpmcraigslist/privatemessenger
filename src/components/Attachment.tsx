@@ -7,6 +7,7 @@ type Props = {
   path: string;
   name: string;
   isImage: boolean;
+  onLoad?: () => void;
 };
 
 /**
@@ -19,6 +20,7 @@ export default function Attachment({
   path,
   name,
   isImage,
+  onLoad,
 }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -70,6 +72,7 @@ export default function Attachment({
           alt={name}
           className="my-1 max-h-72 w-full rounded-md object-cover"
           loading="lazy"
+          onLoad={onLoad}
         />
       </a>
     );

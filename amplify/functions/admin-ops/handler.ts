@@ -274,6 +274,25 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       }
       return { username: handle };
     }
+    case 'adminForcePasswordChange': {
+      const { username, temporaryPassword } = event.arguments;
+      if (!username || !temporaryPassword) {
+        throw new Error('username and temporaryPassword are required');
+      }
+      const handle = username.trim().toLowerCase();
+      await cognito.send(
+        new AdminSetUserPasswordCommand({
+          UserPoolId: poolId(),
+          Username: toLoginId(handle),
+          Password: temporaryPassword,
+          Permanent: false,
+        }),
+      );
+      return {
+        username: handle,
+        message: `${handle} must change password on next sign-in.`,
+      };
+    }
     case 'adminPurgeUsers': {
       const users = await listUsers();
       let deleted = 0;

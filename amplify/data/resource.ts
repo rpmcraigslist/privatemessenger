@@ -81,6 +81,11 @@ const schema = a
       username: a.string().required(),
     }),
 
+    AdminForcePasswordChangeResult: a.customType({
+      username: a.string().required(),
+      message: a.string().required(),
+    }),
+
     AdminPurgeUsersResult: a.customType({
       deleted: a.integer().required(),
     }),
@@ -157,6 +162,16 @@ const schema = a
       .mutation()
       .arguments({ username: a.string().required() })
       .returns(a.ref('AdminDeleteUserResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminForcePasswordChange: a
+      .mutation()
+      .arguments({
+        username: a.string().required(),
+        temporaryPassword: a.string().required(),
+      })
+      .returns(a.ref('AdminForcePasswordChangeResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

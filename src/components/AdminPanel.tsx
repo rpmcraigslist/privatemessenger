@@ -98,6 +98,28 @@ export default function AdminPanel({ onClose }: Props) {
     }
   }
 
+  async function forcePasswordChange(username: string) {
+    const temp = prompt(
+      `Temporary password for "${username}"\n\nThey must change it on next sign-in.`,
+    );
+    if (!temp?.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { data, errors } = await client.mutations.adminForcePasswordChange({
+        username,
+        temporaryPassword: temp,
+      });
+      if (errors?.length) throw new Error(errors[0].message);
+      setMessage(data?.message ?? `Password reset for ${username}.`);
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password reset failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function removeUser(username: string) {
     if (!confirm(`Remove user "${username}"?`)) return;
     setBusy(true);
@@ -232,22 +254,37 @@ export default function AdminPanel({ onClose }: Props) {
                 {users.map((u) => (
                   <li
                     key={u.loginId}
-                    className="flex items-center justify-between rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
+                    className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
                   >
-                    <div>
-                      <p className="font-medium">{formatUserHandle(u.username)}</p>
-                      <p className="text-xs text-[var(--color-muted)]">
-                        {u.status}
-                        {u.phoneNumber ? ` · ${u.phoneNumber}` : ''}
-                      </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium">{formatUserHandle(u.username)}</p>
+                        <p className="text-xs text-[var(--color-muted)]">
+                          {u.status === 'FORCE_CHANGE_PASSWORD'
+                            ? 'Must change password on login'
+                            : u.status}
+                          {u.phoneNumber ? ` · ${u.phoneNumber}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void forcePasswordChange(u.username)}
+                          disabled={busy}
+                          className="text-[var(--color-accent)] hover:underline disabled:opacity-40"
+                        >
+                          Reset password
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void removeUser(u.username)}
+                          disabled={busy}
+                          className="text-red-400 hover:text-red-300 disabled:opacity-40"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => void removeUser(u.username)}
-                      disabled={busy}
-                      className="text-red-400 hover:text-red-300 disabled:opacity-40"
-                    >
-                      Remove
-                    </button>
                   </li>
                 ))}
               </ul>

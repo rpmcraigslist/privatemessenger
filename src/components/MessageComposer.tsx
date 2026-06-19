@@ -66,12 +66,19 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
       });
 
       if (created?.id) {
-        void client.mutations
-          .sendMessageAlerts({
+        try {
+          const { data, errors } = await client.mutations.sendMessageAlerts({
             messageId: created.id,
             appUrl: window.location.origin,
-          })
-          .catch((err) => console.error('message alert failed', err));
+          });
+          if (errors?.length) {
+            console.error('message alert mutation failed', errors);
+          } else if (data && data.sent === 0 && (data.failed ?? 0) > 0) {
+            console.error('message alert SMS failed — check SNS sandbox / CloudWatch logs', data);
+          }
+        } catch (err) {
+          console.error('message alert failed', err);
+        }
       }
 
       const preview =

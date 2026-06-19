@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
-import { markConversationRead } from '../lib/read-state';
+import { getLastReadAt, markConversationRead } from '../lib/read-state';
 import {
   conversationTitle,
   formatTime,
@@ -34,7 +34,9 @@ export default function ChatView({
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const onConversationUpdatedRef = useRef(onConversationUpdated);
+  onConversationUpdatedRef.current = onConversationUpdated;
 
   const title = conversationTitle(
     conversation.participants,
@@ -44,26 +46,26 @@ export default function ChatView({
     subToUsername,
   );
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+  const scrollToBottom = useCallback(() => {
     const container = scrollRef.current;
-    if (container) {
-      container.scrollTo({ top: container.scrollHeight, behavior });
-      return;
-    }
-    bottomRef.current?.scrollIntoView({ behavior });
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
   }, []);
 
   const markRead = useCallback(
     (items: MessageModel[]) => {
       const last = items[items.length - 1];
       if (!last) return;
+      const previous = getLastReadAt(mySub, conversation.id);
+      if (previous === last.createdAt) return;
       markConversationRead(mySub, conversation.id, last.createdAt);
-      onConversationUpdated();
+      onConversationUpdatedRef.current();
     },
-    [conversation.id, mySub, onConversationUpdated],
+    [conversation.id, mySub],
   );
 
   useEffect(() => {
+    stickToBottomRef.current = true;
     setLoading(true);
     const sub = client.models.Message.observeQuery({
       filter: { conversationId: { eq: conversation.id } },
@@ -86,14 +88,30 @@ export default function ChatView({
   }, [conversation.id, markRead]);
 
   useEffect(() => {
-    scrollToBottom('auto');
-  }, [conversation.id, scrollToBottom]);
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const onScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      stickToBottomRef.current = distanceFromBottom < 96;
+    };
+
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, [conversation.id]);
+
+  const tailMessage = messages[messages.length - 1];
+  const scrollTrigger = tailMessage
+    ? `${messages.length}:${tailMessage.id}:${tailMessage.createdAt}`
+    : `${messages.length}:empty`;
 
   useEffect(() => {
-    if (!loading) {
-      scrollToBottom('smooth');
-    }
-  }, [messages.length, loading, scrollToBottom]);
+    if (loading || !stickToBottomRef.current) return;
+    requestAnimationFrame(() => {
+      scrollToBottom();
+    });
+  }, [conversation.id, loading, scrollTrigger, scrollToBottom]);
 
   return (
     <>
@@ -182,7 +200,7 @@ export default function ChatView({
                 />
               );
             })}
-            <div ref={bottomRef} />
+            <div aria-hidden="true" />
           </div>
         )}
       </div>

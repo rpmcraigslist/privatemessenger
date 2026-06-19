@@ -102,6 +102,10 @@ export default function Messenger({ onSignOut }: Props) {
     setUnreadCounts(new Map(entries));
   }, [conversations, selectedId, subToUsername, user]);
 
+  const handleConversationUpdated = useCallback(() => {
+    void refreshUnreadCounts();
+  }, [refreshUnreadCounts]);
+
   useEffect(() => {
     if (!user || conversations.length === 0) {
       setUnreadCounts(new Map());
@@ -168,7 +172,7 @@ export default function Messenger({ onSignOut }: Props) {
             mySub={user.cognitoSub}
             subToUsername={subToUsername}
             onBack={() => setSelectedId(null)}
-            onConversationUpdated={() => void refreshUnreadCounts()}
+            onConversationUpdated={handleConversationUpdated}
           />
         ) : (
           <EmptyState />

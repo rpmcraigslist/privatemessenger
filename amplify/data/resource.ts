@@ -97,6 +97,8 @@ const schema = a
 
     MessageAlertsResult: a.customType({
       sent: a.integer().required(),
+      failed: a.integer(),
+      skipped: a.integer(),
       conversationId: a.string(),
     }),
 

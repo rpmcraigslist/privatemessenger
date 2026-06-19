@@ -1,0 +1,82 @@
+---
+description: CLI tool locations and PATH setup for the agent shell on this machine
+alwaysApply: true
+---
+
+# Environment Tools (Windows / Cursor agent shell)
+
+The agent runs **PowerShell** with a **minimal PATH**. Do not assume `git`, `make`,
+or other tools are available until verified. Prefer **absolute paths** below when a
+tool is missing from PATH.
+
+## PATH shim directory (WinGet)
+
+Tools installed via `winget` appear here and are on the agent PATH:
+
+```
+C:\Users\Pmecham\AppData\Local\Microsoft\WinGet\Links
+```
+
+Current shims there: `helm.exe`, `kustomize.exe`, `rg.exe`, `terraform.exe`.
+
+Several tools are installed but **not on the agent PATH** (cmder/cygwin/GnuWin32).
+Use the absolute paths below — do not assume the bare command name works.
+
+## Tool inventory
+
+These paths are verified. If a bare command reports "not recognized", use the
+absolute path (or prepend its directory to `$env:Path` for that invocation).
+
+| Tool | On PATH? | Resolved path / command |
+|------|----------|-------------------------|
+| `git` | No — use full path | `c:\cmder\vendor\git-for-windows\cmd\git.exe` |
+| `make` | No — use full path | `C:\Program Files (x86)\GnuWin32\bin\make.exe` (GNU Make 3.81) |
+| `jq` | No — use full path | `c:\cygwin64\bin\jq.exe` |
+| `tsc` | No — per-project | `npx tsc` in service dir, or `C:\nvm4w\nodejs\tsc` |
+| `kubectl` | Yes | `C:\Program Files\Docker\Docker\resources\bin\kubectl.exe` |
+| `docker` | Yes | `C:\Program Files\Docker\Docker\resources\bin\docker.exe` |
+| `node` | Yes | `c:\Program Files\cursor\resources\app\resources\helpers\node.exe` |
+| `npm` | Yes | `C:\nvm4w\nodejs\npm.ps1` |
+| `python` | Yes | `C:\Users\All Users\anaconda3\python.exe` |
+| `gh` | Yes | `C:\Program Files\GitHub CLI\gh.exe` |
+| `az` | Yes | `C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd` |
+| `rg` | Yes | `C:\Users\Pmecham\AppData\Local\Microsoft\WinGet\Links\rg.exe` |
+
+> If you need a tool that isn't listed, ask the user — they will install it and
+> provide the path to add here.
+
+## Using off-PATH tools in agent commands
+
+Invoke with the call operator and quoted absolute path:
+
+```powershell
+& 'c:\cmder\vendor\git-for-windows\cmd\git.exe' status
+& 'c:\cygwin64\bin\jq.exe' '.' file.json
+& 'C:\Program Files (x86)\GnuWin32\bin\make.exe' build-agent
+```
+
+Or prepend the directory to PATH for the session so the bare name works:
+
+```powershell
+$env:Path = "c:\cmder\vendor\git-for-windows\cmd;$env:Path"
+git --version
+```
+
+## Verification (refresh inventory)
+
+```powershell
+& 'c:\cmder\vendor\git-for-windows\cmd\git.exe' --version
+& 'c:\cygwin64\bin\jq.exe' --version
+& 'C:\Program Files (x86)\GnuWin32\bin\make.exe' --version | Select-Object -First 1
+```
+
+## Agent conventions
+
+- **git**: use full path or `$env:Path` prepend if `git` reports "not recognized"
+- **grep in repo**: prefer Cursor `Grep` tool; in shell use `rg` (not `grep` on QC jump boxes)
+- **make build-agent**: requires `make` + `git`; used by `capabilities-gateway`, `frontend`, `application-service` pipelines locally
+- **kubectl**: comes from Docker Desktop; cluster context is user-managed (QC EKS via jump box)
+
+## Line endings
+
+- Always use unix style line endings for file contents that are used by our docker containers.  Havine Window/DOS line endings can cause issues in these containers.

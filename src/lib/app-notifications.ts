@@ -155,7 +155,6 @@ export function showMessageNotification(options: {
   const notification = new Notification(options.title, {
     body: options.body,
     tag: `message-${options.conversationId}`,
-    renotify: true,
     icon: '/icon.svg',
     badge: '/icon.svg',
   });

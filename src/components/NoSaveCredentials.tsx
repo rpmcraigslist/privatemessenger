@@ -81,7 +81,9 @@ export function NoSaveField({
 
   const inputType = isPassword ? (unlocked ? 'password' : 'text') : type;
   const maskedTextStyle: CSSProperties | undefined =
-    isPassword && !unlocked ? { WebkitTextSecurity: 'disc' } : undefined;
+    isPassword && !unlocked
+      ? ({ WebkitTextSecurity: 'disc' } as CSSProperties)
+      : undefined;
 
   const input = (
     <input

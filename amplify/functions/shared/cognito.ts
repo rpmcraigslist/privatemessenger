@@ -163,3 +163,19 @@ export function callerSub(identity: unknown): string | null {
 export function isAdminGroupMember(identity: unknown): boolean {
   return parseIdentity(identity).groups.includes('Admin');
 }
+
+/** Normalize user-entered phone numbers to E.164 for SNS (+country + digits). */
+export function normalizePhoneE164(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const compact = trimmed.replace(/[\s().-]/g, '');
+  if (/^\+\d{10,15}$/.test(compact)) return compact;
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
+
+  return null;
+}

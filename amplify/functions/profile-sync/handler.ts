@@ -6,15 +6,15 @@ import type { Schema } from '../../data/resource';
 import { env } from '$amplify/env/profile-sync';
 import {
   isAdminGroupMember,
+  isCognitoUuid,
+  normalizePhoneE164,
   parseIdentity,
   resolveUsernameFromPool,
-  isCognitoUuid,
 } from '../shared/cognito';
 import {
   conversationIncludesUser,
   repairParticipantList,
 } from '../shared/participant-repair';
-import { normalizePhoneE164 } from '../shared/phone';
 
 type Handler = Schema['syncMyProfile']['functionHandler'];
 type DataClient = ReturnType<typeof generateClient<Schema>>;

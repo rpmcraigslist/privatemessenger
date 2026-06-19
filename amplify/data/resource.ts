@@ -16,7 +16,7 @@ const schema = a
         avatarColor: a.string(),
         role: a.enum(['admin', 'user']),
         phoneNumber: a.string(),
-        smsNotificationsEnabled: a.boolean().default(false),
+        smsNotificationsEnabled: a.boolean(),
       })
       .secondaryIndexes((index) => [index('username'), index('cognitoSub')])
       .authorization((allow) => [

@@ -63,6 +63,9 @@ backend.attachmentUrl.addEnvironment(
   backend.storage.resources.bucket.bucketName,
 );
 
+backend.messageAlerts.addEnvironment('USER_POOL_ID', poolId);
+userPool.grant(backend.messageAlerts.resources.lambda, 'cognito-idp:ListUsers');
+
 backend.messageAlerts.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['sns:Publish'],

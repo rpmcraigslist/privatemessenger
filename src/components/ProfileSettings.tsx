@@ -1,17 +1,29 @@
 import { useRef, useState } from 'react';
 
-import { formatUserHandle, normalizePhone, phoneError } from '../lib/util';
+import {
+  formatPhoneDisplay,
+  formatUserHandle,
+  normalizePhone,
+  phoneError,
+} from '../lib/util';
 
-import { syncMyProfile, type SessionUser } from '../lib/session';
+import {
+  syncMyProfile,
+  type ProfileUpdate,
+  type SessionUser,
+} from '../lib/session';
 
 type Props = {
   user: SessionUser;
   onClose: () => void;
-  onSaved: (phoneNumber: string | null) => void;
+  onSaved: (update: ProfileUpdate) => void;
 };
 
 export default function ProfileSettings({ user, onClose, onSaved }: Props) {
-  const [phoneNumber, setPhoneNumber] = useState(user.phoneNumber ?? '');
+  const [phoneNumber, setPhoneNumber] = useState(
+    user.phoneNumber ? formatPhoneDisplay(user.phoneNumber) : '',
+  );
+  const [smsEnabled, setSmsEnabled] = useState(user.smsNotificationsEnabled);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dismissOnBackdropClick = useRef(false);
@@ -30,6 +42,12 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
     e.stopPropagation();
   }
 
+  function formatPhoneInput(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    return normalizePhone(trimmed);
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -40,9 +58,29 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
         setError(phoneErr);
         return;
       }
-      const value = normalizePhone(phoneNumber);
-      await syncMyProfile(value);
-      onSaved(value);
+
+      const normalized = formatPhoneInput(phoneNumber);
+      if (smsEnabled && !normalized) {
+        setError('Add a phone number to enable SMS notifications.');
+        return;
+      }
+
+      const saved = await syncMyProfile({
+        phoneNumber: normalized,
+        smsNotificationsEnabled: smsEnabled,
+      });
+
+      if (saved.phoneNumber) {
+        setPhoneNumber(formatPhoneDisplay(saved.phoneNumber));
+      } else {
+        setPhoneNumber('');
+      }
+      setSmsEnabled(saved.smsNotificationsEnabled);
+
+      onSaved({
+        phoneNumber: saved.phoneNumber,
+        smsNotificationsEnabled: saved.smsNotificationsEnabled,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
@@ -83,20 +121,39 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
         <form onSubmit={(e) => void save(e)} className="space-y-4">
           <label className="block">
             <span className="mb-1 block text-sm text-[var(--color-muted)]">
-              Cell phone for SMS alerts (E.164, e.g. +15551234567)
+              Cell phone for SMS alerts
             </span>
             <input
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="+15551234567"
+              onBlur={() => {
+                const normalized = formatPhoneInput(phoneNumber);
+                if (normalized) {
+                  setPhoneNumber(formatPhoneDisplay(normalized));
+                }
+              }}
+              placeholder="8013684783 or (801) 368-4783"
+              inputMode="tel"
+              autoComplete="tel"
               className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 outline-none"
             />
           </label>
 
-          <p className="text-xs text-[var(--color-muted)]">
-            You receive a text when someone sends you a new message. SMS rates
-            apply via AWS.
-          </p>
+          <label className="flex items-start gap-3 rounded-lg bg-[var(--color-panel-2)] px-3 py-3">
+            <input
+              type="checkbox"
+              checked={smsEnabled}
+              onChange={(e) => setSmsEnabled(e.target.checked)}
+              className="mt-1"
+            />
+            <span className="text-sm">
+              <span className="font-medium">SMS notifications</span>
+              <span className="mt-0.5 block text-[var(--color-muted)]">
+                Text me when someone sends a new message. Standard SMS rates
+                apply.
+              </span>
+            </span>
+          </label>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 

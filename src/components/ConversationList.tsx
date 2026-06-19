@@ -11,6 +11,7 @@ type Props = {
   conversations: ConversationModel[];
   selectedId: string | null;
   loading: boolean;
+  unreadCounts: Map<string, number>;
   onSelect: (id: string) => void;
   onNewChat: () => void;
   onOpenAdmin: () => void;
@@ -26,6 +27,7 @@ export default function ConversationList({
   conversations,
   selectedId,
   loading,
+  unreadCounts,
   onSelect,
   onNewChat,
   onOpenAdmin,
@@ -38,11 +40,11 @@ export default function ConversationList({
     const q = query.trim().toLowerCase();
     if (!q) return conversations;
     return conversations.filter((c) =>
-      conversationTitle(c.participants, c.name, mySub, subToUsername)
+      conversationTitle(c.participants, c.name, mySub, myUsername, subToUsername)
         .toLowerCase()
         .includes(q),
     );
-  }, [conversations, query, mySub, subToUsername]);
+  }, [conversations, query, mySub, myUsername, subToUsername]);
 
   return (
     <>
@@ -168,9 +170,11 @@ export default function ConversationList({
               c.participants,
               c.name,
               mySub,
+              myUsername,
               subToUsername,
             );
             const active = c.id === selectedId;
+            const unread = unreadCounts.get(c.id) ?? 0;
             return (
               <button
                 key={c.id}
@@ -179,15 +183,32 @@ export default function ConversationList({
                   active ? 'bg-white/10' : ''
                 }`}
               >
-                <Avatar label={title} colorKey={c.id} />
+                <div className="relative shrink-0">
+                  <Avatar label={title} colorKey={c.id} />
+                  {unread > 0 && (
+                    <span
+                      className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
+                      style={{ background: 'var(--color-accent)' }}
+                      aria-label={`${unread} unread messages`}
+                    >
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1 border-b border-white/5 pb-3">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-medium">{title}</span>
+                    <span
+                      className={`truncate ${unread > 0 ? 'font-semibold' : 'font-medium'}`}
+                    >
+                      {title}
+                    </span>
                     <span className="shrink-0 text-xs text-[var(--color-muted)]">
                       {formatListTime(c.lastMessageAt)}
                     </span>
                   </div>
-                  <p className="truncate text-sm text-[var(--color-muted)]">
+                  <p
+                    className={`truncate text-sm ${unread > 0 ? 'font-medium text-white' : 'text-[var(--color-muted)]'}`}
+                  >
                     {c.lastMessage || 'Tap to start chatting'}
                   </p>
                 </div>

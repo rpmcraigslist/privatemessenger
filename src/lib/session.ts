@@ -21,7 +21,13 @@ export type SessionUser = {
   cognitoSub: string;
   isAdmin: boolean;
   phoneNumber: string | null;
+  smsNotificationsEnabled: boolean;
   profileId: string | null;
+};
+
+export type ProfileUpdate = {
+  phoneNumber: string | null;
+  smsNotificationsEnabled: boolean;
 };
 
 const LAST_HANDLE_KEY = 'messenger:lastHandle';
@@ -78,7 +84,7 @@ export async function resolveCurrentSub(): Promise<string> {
 }
 
 export async function syncMyProfile(
-  phoneNumber?: string | null,
+  update?: ProfileUpdate,
 ): Promise<SessionUser> {
   await getCurrentUser();
   const session = await fetchAuthSession();
@@ -89,21 +95,34 @@ export async function syncMyProfile(
   const attrs = await fetchUserAttributes();
   const resolvedHandle = resolveHandleFromTokens(attrs, session);
 
-  const { data, errors } = await client.mutations.syncMyProfile({
-    phoneNumber: phoneNumber ?? attrs.phone_number ?? undefined,
-  });
+  const mutationArgs: {
+    phoneNumber?: string;
+    smsNotificationsEnabled?: boolean;
+  } = {};
+
+  if (update) {
+    mutationArgs.phoneNumber = update.phoneNumber ?? '';
+    mutationArgs.smsNotificationsEnabled = update.smsNotificationsEnabled;
+  }
+
+  const { data, errors } = await client.mutations.syncMyProfile(mutationArgs);
   if (errors?.length || !data) {
     throw new Error(errors?.[0]?.message ?? 'Profile sync failed');
   }
 
-  const username = pickUserHandle(data.username, resolvedHandle, recalledSignInHandle());
+  const username = pickUserHandle(
+    resolvedHandle,
+    recalledSignInHandle(),
+    data.username,
+  );
   rememberSignInHandle(username);
 
   return {
     username,
     cognitoSub: data.cognitoSub,
     isAdmin: data.role === 'admin',
-    phoneNumber: phoneNumber ?? attrs.phone_number ?? null,
+    phoneNumber: data.phoneNumber ?? null,
+    smsNotificationsEnabled: data.smsNotificationsEnabled,
     profileId: data.profileId,
   };
 }

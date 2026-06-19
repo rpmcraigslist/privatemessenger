@@ -7,6 +7,7 @@ import {
   graphqlErrorMessage,
   isValidUsername,
   normalizeUsername,
+  profileDisplayLabel,
   usernameError,
 } from '../lib/util';
 
@@ -218,7 +219,7 @@ export default function NewChatModal({
             <input
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Group name (optional)"
+              placeholder="Name this group (optional)"
               className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 text-sm outline-none placeholder:text-[var(--color-muted)]"
             />
           </div>
@@ -246,13 +247,13 @@ export default function NewChatModal({
               className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-white/5"
             >
               <Avatar
-                label={p.displayName ?? p.username}
+                label={profileDisplayLabel(p.username, p.displayName)}
                 colorKey={p.username}
                 size={40}
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
-                  {p.displayName ?? displayName(p.username)}
+                  {profileDisplayLabel(p.username, p.displayName)}
                 </p>
                 <p className="truncate text-xs text-[var(--color-muted)]">
                   @{p.username}

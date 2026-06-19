@@ -71,20 +71,37 @@ export function isValidUsername(value: string): boolean {
   return /^[a-z0-9._-]{3,32}$/.test(u);
 }
 
+/** Cognito sub or other internal id — never show in the UI. */
+export function isInternalUserId(value: string | null | undefined): boolean {
+  if (!value) return true;
+  if (isCognitoUuid(value)) return true;
+  return !isValidUsername(normalizeUsername(fromLoginId(value)));
+}
+
+/** Valid messenger handle, or null when value is an internal id. */
+export function normalizeProfileHandle(
+  value: string | null | undefined,
+): string | null {
+  if (isInternalUserId(value)) return null;
+  return normalizeUsername(fromLoginId(value!));
+}
+
 /** One directory row per username; prefer rows that have signed in (cognitoSub). */
 export function dedupeUserProfiles<
   T extends { username: string; cognitoSub?: string | null },
 >(profiles: T[]): T[] {
   const byUsername = new Map<string, T>();
   for (const profile of profiles) {
-    if (!isValidUsername(profile.username)) continue;
-    const existing = byUsername.get(profile.username);
+    const handle = normalizeProfileHandle(profile.username);
+    if (!handle) continue;
+    if (profile.cognitoSub && profile.username === profile.cognitoSub) continue;
+    const existing = byUsername.get(handle);
     if (!existing) {
-      byUsername.set(profile.username, profile);
+      byUsername.set(handle, profile);
       continue;
     }
     if (!existing.cognitoSub && profile.cognitoSub) {
-      byUsername.set(profile.username, profile);
+      byUsername.set(handle, profile);
     }
   }
   return [...byUsername.values()];
@@ -100,21 +117,39 @@ export function usernameError(value: string): string | null {
   return null;
 }
 
-/** Normalize optional phone to E.164 (+…). Returns null if empty. */
+/** Normalize optional phone to E.164 (+…). Returns null if empty or invalid. */
 export function normalizePhone(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (/^\+\d{10,15}$/.test(trimmed)) return trimmed;
+
+  const compact = trimmed.replace(/[\s().-]/g, '');
+  if (/^\+\d{10,15}$/.test(compact)) return compact;
+
   const digits = trimmed.replace(/\D/g, '');
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
+
   return null;
+}
+
+/** Friendly display for a stored E.164 number. */
+export function formatPhoneDisplay(value: string | null | undefined): string {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const area = digits.slice(1, 4);
+    const prefix = digits.slice(4, 7);
+    const line = digits.slice(7, 11);
+    return `(${area}) ${prefix}-${line}`;
+  }
+  return value;
 }
 
 export function phoneError(value: string): string | null {
   if (!value.trim()) return null;
   if (normalizePhone(value)) return null;
-  return 'Use E.164 format, e.g. +18013684783 (include + and country code).';
+  return 'Could not read that phone number. Try 10 digits or include country code.';
 }
 
 export function mapAuthError(err: unknown): string {
@@ -166,10 +201,7 @@ export function initials(value: string): string {
 
 /** Never show Cognito internal UUIDs in the UI. */
 export function formatUserHandle(handle: string | null | undefined): string {
-  if (!handle || isCognitoUuid(handle)) return 'your account';
-  const bare = normalizeUsername(fromLoginId(handle));
-  if (!isValidUsername(bare)) return 'your account';
-  return bare;
+  return normalizeProfileHandle(handle) ?? 'your account';
 }
 
 /** First usable messenger handle from several candidates. */
@@ -177,23 +209,82 @@ export function pickUserHandle(
   ...candidates: (string | null | undefined)[]
 ): string {
   for (const candidate of candidates) {
-    if (!candidate || isCognitoUuid(candidate)) continue;
-    const bare = normalizeUsername(fromLoginId(candidate));
-    if (isValidUsername(bare)) return bare;
+    const handle = normalizeProfileHandle(candidate);
+    if (handle) return handle;
   }
   return 'user';
 }
 
 export function displayName(username: string): string {
-  if (isCognitoUuid(username) || !isValidUsername(normalizeUsername(fromLoginId(username)))) {
-    return 'User';
-  }
-  const bare = fromLoginId(username);
-  return bare
+  const handle = normalizeProfileHandle(username);
+  if (!handle) return 'User';
+  return handle
     .split(/[.\-_]+/)
     .filter(Boolean)
     .map((p) => p[0].toUpperCase() + p.slice(1))
     .join(' ');
+}
+
+/** Safe directory / profile label (never shows Cognito subs). */
+export function profileDisplayLabel(
+  username: string | null | undefined,
+  displayNameValue?: string | null,
+): string {
+  const handle = normalizeProfileHandle(username);
+  const cleanTitle = normalizeProfileHandle(displayNameValue);
+  if (cleanTitle) return displayName(cleanTitle);
+  if (handle) return displayName(handle);
+  return 'User';
+}
+
+/** Map participant ids (sub, login id, handle) to bare handles for display. */
+export function buildParticipantDirectory(
+  profiles: { username: string; cognitoSub?: string | null }[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const profile of profiles) {
+    const handle = normalizeProfileHandle(profile.username);
+    if (!handle) continue;
+    if (profile.cognitoSub) map.set(profile.cognitoSub, handle);
+    map.set(toLoginId(handle), handle);
+    map.set(handle, handle);
+  }
+  return map;
+}
+
+export function resolveParticipantHandle(
+  participant: string,
+  subToUsername: Map<string, string>,
+): string {
+  return (
+    subToUsername.get(participant) ??
+    normalizeProfileHandle(participant) ??
+    participant
+  );
+}
+
+export function participantDisplayName(
+  participant: string,
+  subToUsername: Map<string, string>,
+): string {
+  const mapped = subToUsername.get(participant);
+  if (mapped) return displayName(mapped);
+  const handle = normalizeProfileHandle(participant);
+  if (handle) return displayName(handle);
+  return 'User';
+}
+
+export function isSameMessengerUser(
+  left: string,
+  myUsername: string,
+  mySub: string,
+  subToUsername: Map<string, string>,
+): boolean {
+  if (left === myUsername || left === mySub) return true;
+  if (left === toLoginId(myUsername)) return true;
+  const leftHandle =
+    subToUsername.get(left) ?? normalizeProfileHandle(left);
+  return leftHandle === myUsername;
 }
 
 export function formatTime(iso?: string | null): string {
@@ -226,15 +317,19 @@ export function conversationTitle(
   participants: (string | null)[],
   name: string | null | undefined,
   mySub: string,
+  myUsername: string,
   subToUsername: Map<string, string>,
 ): string {
   if (name) return name;
-  const others = participants.filter((p): p is string => !!p && p !== mySub);
+  const others = participants.filter(
+    (p): p is string =>
+      !!p && !isSameMessengerUser(p, myUsername, mySub, subToUsername),
+  );
   if (others.length === 0) return 'You';
-  const label = (sub: string) => {
-    const username = subToUsername.get(sub);
-    return username ? displayName(username) : 'User';
-  };
-  if (others.length === 1) return label(others[0]);
-  return others.map(label).join(', ');
+  if (others.length === 1) {
+    return participantDisplayName(others[0], subToUsername);
+  }
+  return others
+    .map((p) => participantDisplayName(p, subToUsername))
+    .join(', ');
 }

@@ -16,6 +16,7 @@ const schema = a
         avatarColor: a.string(),
         role: a.enum(['admin', 'user']),
         phoneNumber: a.string(),
+        smsNotificationsEnabled: a.boolean().default(false),
       })
       .secondaryIndexes((index) => [index('username'), index('cognitoSub')])
       .authorization((allow) => [
@@ -99,6 +100,8 @@ const schema = a
       username: a.string().required(),
       cognitoSub: a.string().required(),
       role: a.string().required(),
+      phoneNumber: a.string(),
+      smsNotificationsEnabled: a.boolean().required(),
     }),
 
     DirectoryUser: a.customType({
@@ -181,7 +184,10 @@ const schema = a
 
     syncMyProfile: a
       .mutation()
-      .arguments({ phoneNumber: a.string() })
+      .arguments({
+        phoneNumber: a.string(),
+        smsNotificationsEnabled: a.boolean(),
+      })
       .returns(a.ref('SyncProfileResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(profileSync)),

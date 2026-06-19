@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { client } from '../lib/amplify';
 import {
+  formatUserHandle,
   normalizePhone,
   normalizeUsername,
   phoneError,
@@ -234,7 +235,7 @@ export default function AdminPanel({ onClose }: Props) {
                     className="flex items-center justify-between rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
                   >
                     <div>
-                      <p className="font-medium">{u.username}</p>
+                      <p className="font-medium">{formatUserHandle(u.username)}</p>
                       <p className="text-xs text-[var(--color-muted)]">
                         {u.status}
                         {u.phoneNumber ? ` · ${u.phoneNumber}` : ''}

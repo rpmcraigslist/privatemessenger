@@ -14,6 +14,7 @@ import {
   conversationIncludesUser,
   repairParticipantList,
 } from '../shared/participant-repair';
+import { normalizePhoneE164 } from '../shared/phone';
 
 type Handler = Schema['syncMyProfile']['functionHandler'];
 type DataClient = ReturnType<typeof generateClient<Schema>>;
@@ -138,12 +139,33 @@ export const handler: Handler = async (event) => {
     throw new Error('Could not resolve username from Cognito profile');
   }
 
-  const { phoneNumber } = event.arguments;
+  const { phoneNumber: phoneArg, smsNotificationsEnabled: smsArg } =
+    event.arguments;
   const isAdmin = isAdminGroupMember(event.identity);
   const client = await dataClientPromise;
 
-  const phone = phoneNumber?.trim() || null;
   const existing = await consolidateProfiles(client, username, sub);
+
+  let phone = existing?.phoneNumber ?? null;
+  if (phoneArg !== undefined && phoneArg !== null) {
+    const trimmed = phoneArg.trim();
+    if (!trimmed) {
+      phone = null;
+    } else {
+      phone = normalizePhoneE164(trimmed);
+      if (!phone) {
+        throw new Error('Enter a valid phone number');
+      }
+    }
+  }
+
+  let smsEnabled = existing?.smsNotificationsEnabled ?? false;
+  if (smsArg !== undefined && smsArg !== null) {
+    smsEnabled = smsArg === true;
+  }
+  if (smsEnabled && !phone) {
+    throw new Error('Add a phone number to enable SMS notifications');
+  }
 
   if (!existing) {
     const created = await client.models.UserProfile.create(
@@ -153,6 +175,7 @@ export const handler: Handler = async (event) => {
         displayName: username,
         role: isAdmin ? 'admin' : 'user',
         phoneNumber: phone,
+        smsNotificationsEnabled: smsEnabled,
         avatarColor: isAdmin ? '#00a884' : '#64b5f6',
       },
       { authMode: 'iam' },
@@ -163,6 +186,8 @@ export const handler: Handler = async (event) => {
       username,
       cognitoSub: sub,
       role: isAdmin ? 'admin' : 'user',
+      phoneNumber: phone,
+      smsNotificationsEnabled: smsEnabled,
     };
   }
 
@@ -175,7 +200,8 @@ export const handler: Handler = async (event) => {
       username,
       cognitoSub: sub,
       role,
-      phoneNumber: phone ?? existing.phoneNumber,
+      phoneNumber: phone,
+      smsNotificationsEnabled: smsEnabled,
     },
     { authMode: 'iam' },
   );
@@ -187,5 +213,7 @@ export const handler: Handler = async (event) => {
     username,
     cognitoSub: sub,
     role,
+    phoneNumber: phone,
+    smsNotificationsEnabled: smsEnabled,
   };
 };

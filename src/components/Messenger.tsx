@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { client, type ConversationModel } from '../lib/amplify';
 import { loadUserDirectory } from '../lib/directory';
+import { fetchUnreadCount, getLastReadAt } from '../lib/read-state';
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
+import { buildParticipantDirectory } from '../lib/util';
 import ConversationList from './ConversationList';
 import ChatView from './ChatView';
 import NewChatModal from './NewChatModal';
@@ -21,6 +23,9 @@ export default function Messenger({ onSignOut }: Props) {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(
+    () => new Map(),
+  );
   const [subToUsername, setSubToUsername] = useState<Map<string, string>>(
     () => new Map(),
   );
@@ -49,11 +54,7 @@ export default function Messenger({ onSignOut }: Props) {
     void (async () => {
       try {
         const profiles = await loadUserDirectory();
-        const map = new Map<string, string>();
-        for (const p of profiles) {
-          if (p.cognitoSub) map.set(p.cognitoSub, p.username);
-        }
-        setSubToUsername(map);
+        setSubToUsername(buildParticipantDirectory(profiles));
       } catch (err) {
         console.error('failed to load profile directory', err);
       }
@@ -80,6 +81,34 @@ export default function Messenger({ onSignOut }: Props) {
     });
     return () => sub.unsubscribe();
   }, [user?.username]);
+
+  const refreshUnreadCounts = useCallback(async () => {
+    if (!user) return;
+    const entries = await Promise.all(
+      conversations.map(async (conversation) => {
+        if (conversation.id === selectedId) {
+          return [conversation.id, 0] as const;
+        }
+        const count = await fetchUnreadCount(
+          conversation.id,
+          getLastReadAt(user.cognitoSub, conversation.id),
+          user.username,
+          user.cognitoSub,
+          subToUsername,
+        );
+        return [conversation.id, count] as const;
+      }),
+    );
+    setUnreadCounts(new Map(entries));
+  }, [conversations, selectedId, subToUsername, user]);
+
+  useEffect(() => {
+    if (!user || conversations.length === 0) {
+      setUnreadCounts(new Map());
+      return;
+    }
+    void refreshUnreadCounts();
+  }, [conversations, refreshUnreadCounts, user]);
 
   const selected = useMemo(
     () => conversations.find((c) => c.id === selectedId) ?? null,
@@ -117,6 +146,7 @@ export default function Messenger({ onSignOut }: Props) {
           conversations={conversations}
           selectedId={selectedId}
           loading={loading}
+          unreadCounts={unreadCounts}
           onSelect={setSelectedId}
           onNewChat={() => setShowNewChat(true)}
           onOpenAdmin={() => setShowAdmin(true)}
@@ -138,6 +168,7 @@ export default function Messenger({ onSignOut }: Props) {
             mySub={user.cognitoSub}
             subToUsername={subToUsername}
             onBack={() => setSelectedId(null)}
+            onConversationUpdated={() => void refreshUnreadCounts()}
           />
         ) : (
           <EmptyState />
@@ -166,8 +197,8 @@ export default function Messenger({ onSignOut }: Props) {
         <ProfileSettings
           user={user}
           onClose={() => setShowProfile(false)}
-          onSaved={(phoneNumber) =>
-            setUser((prev) => (prev ? { ...prev, phoneNumber } : prev))
+          onSaved={(update) =>
+            setUser((prev) => (prev ? { ...prev, ...update } : prev))
           }
         />
       )}

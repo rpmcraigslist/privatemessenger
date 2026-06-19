@@ -4,7 +4,7 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../data/resource';
 import { env } from '$amplify/env/message-alerts';
-import { isCognitoUuid, parseIdentity } from '../shared/cognito';
+import { isCognitoUuid, resolveCallerIdentity } from '../shared/cognito';
 
 type Handler = Schema['sendMessageAlerts']['functionHandler'];
 
@@ -35,9 +35,8 @@ function loginUrl(appUrl?: string | null): string {
 
 export const handler: Handler = async (event) => {
   const { messageId, appUrl } = event.arguments;
-  const { sub: callerSub, username: callerUsername } = parseIdentity(
-    event.identity,
-  );
+  const { sub: callerSub, username: callerUsername } =
+    await resolveCallerIdentity(event.identity);
   if (!callerSub) {
     throw new Error('Unauthorized');
   }
@@ -65,7 +64,7 @@ export const handler: Handler = async (event) => {
     });
     const profile = profiles.data[0];
     const phone = profile?.phoneNumber?.trim();
-    if (!phone) continue;
+    if (!profile?.smsNotificationsEnabled || !phone) continue;
 
     try {
       await sns.send(

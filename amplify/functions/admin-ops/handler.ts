@@ -15,6 +15,7 @@ import { env } from '$amplify/env/admin-ops';
 import {
   fromLoginId,
   isAdminGroupMember,
+  isCognitoUuid,
   poolId,
   resolveCallerIdentity,
   toLoginId,
@@ -103,12 +104,17 @@ async function listUserDirectory() {
 
   for (const profile of profiles.data) {
     if (!/^[a-z0-9._-]{3,32}$/.test(profile.username)) continue;
+    if (isCognitoUuid(profile.username)) continue;
+    if (profile.cognitoSub && profile.username === profile.cognitoSub) continue;
     const existing = byUsername.get(profile.username);
+    const rawTitle = profile.displayName?.trim();
+    const displayName =
+      rawTitle && !isCognitoUuid(rawTitle) ? rawTitle : profile.username;
     const entry = {
       id: profile.id,
       username: profile.username,
       cognitoSub: profile.cognitoSub ?? null,
-      displayName: profile.displayName ?? profile.username,
+      displayName,
       avatarColor: profile.avatarColor ?? null,
     };
     if (!existing || (!existing.cognitoSub && entry.cognitoSub)) {

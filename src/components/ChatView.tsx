@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
-import { conversationTitle, displayName, formatTime } from '../lib/util';
+import { markConversationRead } from '../lib/read-state';
+import {
+  conversationTitle,
+  formatTime,
+  isSameMessengerUser,
+  participantDisplayName,
+  resolveParticipantHandle,
+} from '../lib/util';
 import Avatar from './Avatar';
+import ChatGroupPanel from './ChatGroupPanel';
 import MessageComposer from './MessageComposer';
 import Attachment from './Attachment';
 
@@ -11,6 +19,7 @@ type Props = {
   mySub: string;
   subToUsername: Map<string, string>;
   onBack: () => void;
+  onConversationUpdated: () => void;
 };
 
 export default function ChatView({
@@ -19,16 +28,39 @@ export default function ChatView({
   mySub,
   subToUsername,
   onBack,
+  onConversationUpdated,
 }: Props) {
   const [messages, setMessages] = useState<MessageModel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const title = conversationTitle(
     conversation.participants,
     conversation.name,
     mySub,
+    myUsername,
     subToUsername,
+  );
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const container = scrollRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+      return;
+    }
+    bottomRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  const markRead = useCallback(
+    (items: MessageModel[]) => {
+      const last = items[items.length - 1];
+      if (!last) return;
+      markConversationRead(mySub, conversation.id, last.createdAt);
+      onConversationUpdated();
+    },
+    [conversation.id, mySub, onConversationUpdated],
   );
 
   useEffect(() => {
@@ -43,6 +75,7 @@ export default function ChatView({
         );
         setMessages(sorted);
         setLoading(false);
+        markRead(sorted);
       },
       error: (err) => {
         console.error('message subscription error', err);
@@ -50,11 +83,17 @@ export default function ChatView({
       },
     });
     return () => sub.unsubscribe();
-  }, [conversation.id]);
+  }, [conversation.id, markRead]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    scrollToBottom('auto');
+  }, [conversation.id, scrollToBottom]);
+
+  useEffect(() => {
+    if (!loading) {
+      scrollToBottom('smooth');
+    }
+  }, [messages.length, loading, scrollToBottom]);
 
   return (
     <>
@@ -75,16 +114,30 @@ export default function ChatView({
           </svg>
         </button>
         <Avatar label={title} colorKey={conversation.id} size={40} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{title}</p>
           <p className="truncate text-xs text-[var(--color-muted)]">
             {conversation.participants.filter(Boolean).length} participant
             {conversation.participants.length === 1 ? '' : 's'}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowDetails(true)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-muted)] hover:bg-white/10 hover:text-white"
+          title="Chat details"
+          aria-label="Chat details"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="5" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="19" r="1.5" fill="currentColor" />
+          </svg>
+        </button>
       </header>
 
       <div
+        ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-12"
         style={{
           backgroundColor: 'var(--color-app-bg)',
@@ -104,18 +157,28 @@ export default function ChatView({
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-1.5">
             {messages.map((m, i) => {
-              const mine = m.senderUsername === myUsername;
+              const mine = isSameMessengerUser(
+                m.senderUsername,
+                myUsername,
+                mySub,
+                subToUsername,
+              );
               const prev = messages[i - 1];
               const showSender =
                 !mine &&
                 conversation.participants.length > 2 &&
-                prev?.senderUsername !== m.senderUsername;
+                resolveParticipantHandle(
+                  prev?.senderUsername ?? '',
+                  subToUsername,
+                ) !==
+                  resolveParticipantHandle(m.senderUsername, subToUsername);
               return (
                 <Bubble
                   key={m.id}
                   message={m}
                   mine={mine}
                   showSender={showSender}
+                  subToUsername={subToUsername}
                 />
               );
             })}
@@ -125,6 +188,20 @@ export default function ChatView({
       </div>
 
       <MessageComposer conversation={conversation} myUsername={myUsername} />
+
+      {showDetails && (
+        <ChatGroupPanel
+          conversation={conversation}
+          myUsername={myUsername}
+          mySub={mySub}
+          subToUsername={subToUsername}
+          onClose={() => setShowDetails(false)}
+          onRenamed={() => {
+            onConversationUpdated();
+            setShowDetails(false);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -133,10 +210,12 @@ function Bubble({
   message,
   mine,
   showSender,
+  subToUsername,
 }: {
   message: MessageModel;
   mine: boolean;
   showSender: boolean;
+  subToUsername: Map<string, string>;
 }) {
   return (
     <div className={`flex ${mine ? 'justify-start' : 'justify-end'}`}>
@@ -153,7 +232,7 @@ function Bubble({
             className="mb-0.5 text-xs font-semibold"
             style={{ color: 'var(--color-accent)' }}
           >
-            {displayName(message.senderUsername)}
+            {participantDisplayName(message.senderUsername, subToUsername)}
           </p>
         )}
         {message.attachmentKey && (

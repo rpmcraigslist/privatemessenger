@@ -7,6 +7,7 @@ import {
   phoneError,
   usernameError,
 } from '../lib/util';
+import { NoSaveField, NoSaveForm } from './NoSaveCredentials';
 
 type AdminUser = {
   loginId: string;
@@ -206,24 +207,25 @@ export default function AdminPanel({ onClose }: Props) {
 
           <section className="mb-6">
             <h3 className="mb-2 font-medium">Add user</h3>
-            <form onSubmit={(e) => void createUser(e)} className="space-y-2">
-              <input
+            <NoSaveForm onSubmit={(e) => void createUser(e)} className="space-y-2">
+              <NoSaveField
                 value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
+                onChange={setNewUsername}
                 placeholder="Username"
-                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
+                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
               />
-              <input
+              <NoSaveField
                 type="password"
                 value={tempPassword}
-                onChange={(e) => setTempPassword(e.target.value)}
+                onChange={setTempPassword}
                 placeholder="Temporary password"
-                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
+                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
               />
               <input
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
                 placeholder="Cell phone (optional, +15551234567)"
+                autoComplete="off"
                 className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
               />
               <label className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
@@ -242,7 +244,7 @@ export default function AdminPanel({ onClose }: Props) {
               >
                 Add user
               </button>
-            </form>
+            </NoSaveForm>
           </section>
 
           <section className="mb-6">

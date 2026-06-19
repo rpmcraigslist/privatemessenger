@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { type ConversationModel } from '../lib/amplify';
-import { conversationTitle, formatListTime } from '../lib/util';
+import { conversationTitle, formatListTime, formatUserHandle } from '../lib/util';
 import Avatar from './Avatar';
 
 type Props = {
@@ -198,7 +198,7 @@ export default function ConversationList({
       </div>
 
       <footer className="truncate px-4 py-2 text-xs text-[var(--color-muted)]">
-        Signed in as {myUsername}
+        Signed in as {formatUserHandle(myUsername)}
       </footer>
     </>
   );

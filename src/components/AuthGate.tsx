@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { signOut } from 'aws-amplify/auth';
 import { client } from '../lib/amplify';
 import {
   completeNewPassword,
   ensureValidSession,
+  rememberSignInHandle,
   signInWithUsername,
+  signOutAndClear,
 } from '../lib/session';
 import {
   mapAuthError,
@@ -86,6 +87,7 @@ export default function AuthGate({ children }: Props) {
         throw new Error(errors?.[0]?.message ?? 'Bootstrap failed');
       }
       setBootstrapMessage(data.message);
+      rememberSignInHandle(normalizeUsername(username));
       setPassword('');
       setMode('signIn');
     } catch (err) {
@@ -110,6 +112,7 @@ export default function AuthGate({ children }: Props) {
 
     setBusy(true);
     try {
+      rememberSignInHandle(normalizeUsername(username));
       const result = await signInWithUsername(username, password);
       if (
         result.nextStep.signInStep ===
@@ -160,7 +163,7 @@ export default function AuthGate({ children }: Props) {
     return (
       <>
         {children(async () => {
-          await signOut();
+          await signOutAndClear();
           setMode('signIn');
           setPassword('');
           setNewPassword('');

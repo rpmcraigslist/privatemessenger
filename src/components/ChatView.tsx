@@ -139,7 +139,7 @@ function Bubble({
   showSender: boolean;
 }) {
   return (
-    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${mine ? 'justify-start' : 'justify-end'}`}>
       <div
         className="max-w-[80%] rounded-lg px-2.5 py-1.5 text-[15px] shadow-sm"
         style={{
@@ -165,9 +165,11 @@ function Bubble({
           />
         )}
         {message.content && (
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <p className="whitespace-pre-wrap break-words text-left">{message.content}</p>
         )}
-        <span className="mt-0.5 block text-right text-[10px] text-white/50">
+        <span
+          className={`mt-0.5 block text-[10px] text-white/50 ${mine ? 'text-left' : 'text-right'}`}
+        >
           {formatTime(message.createdAt)}
         </span>
       </div>

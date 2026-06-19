@@ -164,7 +164,30 @@ export function initials(value: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+/** Never show Cognito internal UUIDs in the UI. */
+export function formatUserHandle(handle: string | null | undefined): string {
+  if (!handle || isCognitoUuid(handle)) return 'your account';
+  const bare = normalizeUsername(fromLoginId(handle));
+  if (!isValidUsername(bare)) return 'your account';
+  return bare;
+}
+
+/** First usable messenger handle from several candidates. */
+export function pickUserHandle(
+  ...candidates: (string | null | undefined)[]
+): string {
+  for (const candidate of candidates) {
+    if (!candidate || isCognitoUuid(candidate)) continue;
+    const bare = normalizeUsername(fromLoginId(candidate));
+    if (isValidUsername(bare)) return bare;
+  }
+  return 'user';
+}
+
 export function displayName(username: string): string {
+  if (isCognitoUuid(username) || !isValidUsername(normalizeUsername(fromLoginId(username)))) {
+    return 'User';
+  }
   const bare = fromLoginId(username);
   return bare
     .split(/[.\-_]+/)

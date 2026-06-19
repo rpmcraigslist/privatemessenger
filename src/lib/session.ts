@@ -8,7 +8,13 @@ import {
   type SignInOutput,
 } from 'aws-amplify/auth';
 import { client } from './amplify';
-import { isCognitoUuid, toLoginId, usernameFromAttributes } from './util';
+import {
+  isCognitoUuid,
+  normalizeUsername,
+  pickUserHandle,
+  toLoginId,
+  usernameFromAttributes,
+} from './util';
 
 export type SessionUser = {
   username: string;
@@ -17,6 +23,48 @@ export type SessionUser = {
   phoneNumber: string | null;
   profileId: string | null;
 };
+
+const LAST_HANDLE_KEY = 'messenger:lastHandle';
+
+/** Remember the handle typed at sign-in (per browser tab/session). */
+export function rememberSignInHandle(handle: string): void {
+  const normalized = normalizeUsername(handle);
+  if (!isCognitoUuid(normalized)) {
+    sessionStorage.setItem(LAST_HANDLE_KEY, normalized);
+  }
+}
+
+export function clearRememberedSignInHandle(): void {
+  sessionStorage.removeItem(LAST_HANDLE_KEY);
+}
+
+function recalledSignInHandle(): string | null {
+  const value = sessionStorage.getItem(LAST_HANDLE_KEY);
+  if (!value || isCognitoUuid(value)) return null;
+  return normalizeUsername(value);
+}
+
+function resolveHandleFromTokens(
+  attrs: Awaited<ReturnType<typeof fetchUserAttributes>>,
+  session: Awaited<ReturnType<typeof fetchAuthSession>>,
+): string | null {
+  const fromAttrs = usernameFromAttributes(attrs);
+  if (fromAttrs) return fromAttrs;
+
+  const idPayload = session.tokens?.idToken?.payload;
+  if (idPayload) {
+    const preferred = idPayload['preferred_username'];
+    if (typeof preferred === 'string' && !isCognitoUuid(preferred)) {
+      return normalizeUsername(preferred);
+    }
+    const email = idPayload.email;
+    if (typeof email === 'string') {
+      return usernameFromAttributes({ email, preferred_username: undefined });
+    }
+  }
+
+  return recalledSignInHandle();
+}
 
 export async function resolveCurrentSub(): Promise<string> {
   const session = await fetchAuthSession();
@@ -39,7 +87,7 @@ export async function syncMyProfile(
   }
 
   const attrs = await fetchUserAttributes();
-  const attrUsername = usernameFromAttributes(attrs);
+  const resolvedHandle = resolveHandleFromTokens(attrs, session);
 
   const { data, errors } = await client.mutations.syncMyProfile({
     phoneNumber: phoneNumber ?? attrs.phone_number ?? undefined,
@@ -48,10 +96,8 @@ export async function syncMyProfile(
     throw new Error(errors?.[0]?.message ?? 'Profile sync failed');
   }
 
-  const username =
-    !isCognitoUuid(data.username)
-      ? data.username
-      : (attrUsername ?? data.username);
+  const username = pickUserHandle(data.username, resolvedHandle, recalledSignInHandle());
+  rememberSignInHandle(username);
 
   return {
     username,
@@ -72,7 +118,7 @@ export async function ensureValidSession(): Promise<boolean> {
     return true;
   } catch {
     try {
-      await signOut();
+      await signOutAndClear();
     } catch {
       // ignore
     }
@@ -84,6 +130,7 @@ export async function signInWithUsername(
   username: string,
   password: string,
 ): Promise<SignInOutput> {
+  rememberSignInHandle(username);
   try {
     await signOut();
   } catch {
@@ -94,6 +141,11 @@ export async function signInWithUsername(
 
 export async function completeNewPassword(newPassword: string) {
   return confirmSignIn({ challengeResponse: newPassword });
+}
+
+export async function signOutAndClear(): Promise<void> {
+  clearRememberedSignInHandle();
+  await signOut();
 }
 
 /** Cognito sign-in id (matches participants before sub-based chats). */

@@ -171,7 +171,10 @@ const schema = a
 
     sendMessageAlerts: a
       .mutation()
-      .arguments({ messageId: a.id().required() })
+      .arguments({
+        messageId: a.id().required(),
+        appUrl: a.string(),
+      })
       .returns(a.ref('MessageAlertsResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(messageAlerts)),

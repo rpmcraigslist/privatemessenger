@@ -67,7 +67,10 @@ export default function MessageComposer({ conversation, myUsername }: Props) {
 
       if (created?.id) {
         void client.mutations
-          .sendMessageAlerts({ messageId: created.id })
+          .sendMessageAlerts({
+            messageId: created.id,
+            appUrl: window.location.origin,
+          })
           .catch((err) => console.error('message alert failed', err));
       }
 

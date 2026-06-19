@@ -388,7 +388,7 @@ export default function Messenger({ onSignOut }: Props) {
   }
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-[var(--color-app-bg)]">
+    <div className="app-viewport flex bg-[var(--color-app-bg)]">
       <aside
         className={`${
           selectedId ? 'hidden md:flex' : 'flex'

@@ -13,26 +13,52 @@ export function isStandalonePwa(): boolean {
   );
 }
 
+/** Phone-sized view where the OS back button/gesture should stay in-app. */
+export function shouldInterceptSystemBack(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (isStandalonePwa()) return true;
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function seedHistoryGuard(): void {
+  history.pushState(BACK_GUARD_STATE, '');
+}
+
+/** Call when opening a chat, modal, search panel, reply bar, etc. */
+export function pushAppNavigationLayer(): void {
+  if (!shouldInterceptSystemBack()) return;
+  history.pushState(BACK_GUARD_STATE, '');
+}
+
+/** Same as tapping the in-app back control — walks history when intercepted. */
+export function appNavigateBack(): boolean {
+  if (!shouldInterceptSystemBack()) return false;
+  history.back();
+  return true;
+}
+
 /**
- * Trap the system back gesture/button in installed PWAs so Android does not
- * show the "Exit app?" prompt. Runs the supplied handler first (close chat,
- * dismiss modals), then keeps the user in the app.
+ * Wire the OS back button/gesture to in-app navigation (close overlays, leave
+ * chat) instead of exiting the app or browser tab.
  */
-export function useStandaloneBackGuard(onBack: () => boolean): void {
-  const onBackRef = useRef(onBack);
-  onBackRef.current = onBack;
+export function useSystemBackNavigation(onPop: () => void): void {
+  const onPopRef = useRef(onPop);
+  onPopRef.current = onPop;
 
   useEffect(() => {
-    if (!isStandalonePwa()) return;
+    if (!shouldInterceptSystemBack()) return;
 
-    history.pushState(BACK_GUARD_STATE, '');
+    seedHistoryGuard();
 
     const onPopState = () => {
-      onBackRef.current();
-      history.pushState(BACK_GUARD_STATE, '');
+      onPopRef.current();
+      seedHistoryGuard();
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 }
+
+/** @deprecated use useSystemBackNavigation */
+export const useStandaloneBackGuard = useSystemBackNavigation;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 
-import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
+import { type ConversationModel, type MessageModel } from '../lib/amplify';
 
 import { getLastReadAt, isReadThrough, markConversationRead } from '../lib/read-state';
 
@@ -33,6 +33,7 @@ import ChatGroupPanel from './ChatGroupPanel';
 import MessageComposer from './MessageComposer';
 
 import Attachment from './Attachment';
+import { pushAppNavigationLayer } from '../lib/back-navigation';
 
 export type ChatBackHandle = {
   handleBack: () => boolean;
@@ -41,6 +42,10 @@ export type ChatBackHandle = {
 type Props = {
 
   conversation: ConversationModel;
+
+  messages: MessageModel[];
+
+  messagesSynced: boolean;
 
   myUsername: string;
 
@@ -68,6 +73,10 @@ export default function ChatView({
 
   conversation,
 
+  messages,
+
+  messagesSynced,
+
   myUsername,
 
   mySub,
@@ -83,10 +92,6 @@ export default function ChatView({
   onConversationRenamed,
 
 }: Props) {
-
-  const [messages, setMessages] = useState<MessageModel[]>([]);
-
-  const [synced, setSynced] = useState(false);
 
   const [showDetails, setShowDetails] = useState(false);
 
@@ -126,6 +131,26 @@ export default function ChatView({
       chatBackRef.current = null;
     };
   }, [chatBackRef, replyTo, searchOpen, showDetails]);
+
+  const overlayNavRef = useRef({
+    showDetails: false,
+    searchOpen: false,
+    hasReply: false,
+  });
+
+  useEffect(() => {
+    const prev = overlayNavRef.current;
+    const opened =
+      (showDetails && !prev.showDetails) ||
+      (searchOpen && !prev.searchOpen) ||
+      (Boolean(replyTo) && !prev.hasReply);
+    if (opened) pushAppNavigationLayer();
+    overlayNavRef.current = {
+      showDetails,
+      searchOpen,
+      hasReply: Boolean(replyTo),
+    };
+  }, [showDetails, searchOpen, replyTo]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -251,10 +276,6 @@ export default function ChatView({
 
     stickToBottomRef.current = true;
 
-    setMessages([]);
-
-    setSynced(false);
-
     setSearchOpen(false);
 
     setSearchQuery('');
@@ -263,51 +284,27 @@ export default function ChatView({
 
     setReplyTo(null);
 
+  }, [conversation.id]);
 
 
-    const sub = client.models.Message.observeQuery({
 
-      filter: { conversationId: { eq: conversation.id } },
+  useEffect(() => {
 
-    }).subscribe({
+    latestMessagesRef.current = messages;
 
-      next: ({ items, isSynced }) => {
+    if (messages.length > 0) {
 
-        const sorted = [...items].sort(
+      scheduleMarkRead(messages);
 
-          (a, b) =>
+    }
 
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-
-        );
-
-        setMessages(sorted);
-
-        setSynced(isSynced);
-
-        if (items.length > 0) {
-
-          scheduleMarkRead(sorted);
-
-        }
-
-      },
-
-      error: (err) => {
-
-        console.error('message subscription error', err);
-
-        setSynced(true);
-
-      },
-
-    });
+  }, [messages, scheduleMarkRead]);
 
 
+
+  useEffect(() => {
 
     return () => {
-
-      sub.unsubscribe();
 
       if (markReadTimerRef.current) {
 
@@ -325,7 +322,7 @@ export default function ChatView({
 
     };
 
-  }, [conversation.id, flushMarkRead, scheduleMarkRead]);
+  }, [conversation.id, flushMarkRead]);
 
 
 
@@ -419,9 +416,9 @@ export default function ChatView({
 
 
 
-  const showInitialLoading = !synced && messages.length === 0;
+  const showInitialLoading = !messagesSynced && messages.length === 0;
 
-  const showEmpty = synced && messages.length === 0;
+  const showEmpty = messagesSynced && messages.length === 0;
 
 
 
@@ -1059,47 +1056,37 @@ function Bubble({
 
 }) {
 
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearLongPress() {
+
+    if (longPressTimerRef.current) {
+
+      clearTimeout(longPressTimerRef.current);
+
+      longPressTimerRef.current = null;
+
+    }
+
+  }
+
+  function startLongPress() {
+
+    clearLongPress();
+
+    longPressTimerRef.current = setTimeout(() => {
+
+      onReply();
+
+      navigator.vibrate?.(12);
+
+    }, 480);
+
+  }
+
   return (
 
-    <div className={`group relative flex ${mine ? 'justify-start' : 'justify-end'}`}>
-
-      <button
-
-        type="button"
-
-        onClick={onReply}
-
-        className={`absolute top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--color-panel-2)] text-[var(--color-muted)] opacity-100 shadow-sm transition hover:bg-white/15 hover:text-white sm:opacity-0 sm:group-hover:opacity-100 ${
-
-          mine ? '-right-9' : '-left-9'
-
-        }`}
-
-        title="Reply"
-
-        aria-label="Reply to message"
-
-      >
-
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-
-          <path
-
-            d="M9 17 4 12l5-5M4 12h10a4 4 0 0 1 4 4v1"
-
-            stroke="currentColor"
-
-            strokeWidth="2"
-
-            strokeLinecap="round"
-
-            strokeLinejoin="round"
-
-          />
-
-        </svg>
-
-      </button>
+    <div className={`flex ${mine ? 'justify-start' : 'justify-end'}`}>
 
       <div
 
@@ -1114,6 +1101,14 @@ function Bubble({
             : 'var(--color-bubble-in)',
 
         }}
+
+        onTouchStart={startLongPress}
+
+        onTouchEnd={clearLongPress}
+
+        onTouchCancel={clearLongPress}
+
+        onTouchMove={clearLongPress}
 
       >
 
@@ -1217,15 +1212,35 @@ function Bubble({
 
         )}
 
-        <span
+        <div
 
-          className={`mt-0.5 block text-[10px] text-white/50 ${mine ? 'text-left' : 'text-right'}`}
+          className={`mt-0.5 flex items-center gap-2 ${mine ? 'justify-start' : 'justify-end'}`}
 
         >
 
-          {formatTime(message.createdAt)}
+          <button
 
-        </span>
+            type="button"
+
+            onClick={onReply}
+
+            className="text-[10px] font-medium text-[var(--color-accent)] hover:underline"
+
+            aria-label="Reply to message"
+
+          >
+
+            Reply
+
+          </button>
+
+          <span className="text-[10px] text-white/50">
+
+            {formatTime(message.createdAt)}
+
+          </span>
+
+        </div>
 
       </div>
 

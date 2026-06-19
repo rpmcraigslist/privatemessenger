@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { client, type ConversationModel } from '../lib/amplify';
+import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 import {
   clearUnreadIndicators,
   playMessageSound,
@@ -24,7 +24,11 @@ import NewChatModal from './NewChatModal';
 import AdminPanel from './AdminPanel';
 import ProfileSettings from './ProfileSettings';
 import NotificationPrompt from './NotificationPrompt';
-import { useStandaloneBackGuard } from '../lib/back-navigation';
+import {
+  appNavigateBack,
+  pushAppNavigationLayer,
+  useSystemBackNavigation,
+} from '../lib/back-navigation';
 import type { ChatBackHandle } from './ChatView';
 
 type Props = {
@@ -65,6 +69,8 @@ export default function Messenger({ onSignOut }: Props) {
   const [latestByConversation, setLatestByConversation] = useState<
     Map<string, LatestMessagePreview>
   >(() => new Map());
+  const [allMessages, setAllMessages] = useState<MessageModel[]>([]);
+  const [messagesSynced, setMessagesSynced] = useState(false);
 
   const selectedIdRef = useRef<string | null>(null);
   const userRef = useRef<SessionUser | null>(null);
@@ -92,7 +98,7 @@ export default function Messenger({ onSignOut }: Props) {
     selectedId,
   };
 
-  useStandaloneBackGuard(() => {
+  useSystemBackNavigation(() => {
     if (chatBackRef.current?.handleBack()) return true;
     const ui = uiStateRef.current;
     if (ui.showNewChat) {
@@ -113,6 +119,16 @@ export default function Messenger({ onSignOut }: Props) {
     }
     return false;
   });
+
+  useEffect(() => {
+    if (selectedId) pushAppNavigationLayer();
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (showNewChat || showProfile || showAdmin) {
+      pushAppNavigationLayer();
+    }
+  }, [showNewChat, showProfile, showAdmin]);
 
   useEffect(() => {
     let active = true;
@@ -168,6 +184,9 @@ export default function Messenger({ onSignOut }: Props) {
 
     const sub = client.models.Message.observeQuery().subscribe({
       next: ({ items, isSynced }) => {
+        setAllMessages(items);
+        setMessagesSynced(isSynced);
+
         const next = new Map<string, LatestMessagePreview>();
         for (const message of items) {
           if (!message.conversationId) continue;
@@ -342,6 +361,16 @@ export default function Messenger({ onSignOut }: Props) {
     [conversations, selectedId],
   );
 
+  const selectedMessages = useMemo(() => {
+    if (!selectedId) return [];
+    return allMessages
+      .filter((message) => message.conversationId === selectedId)
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+  }, [allMessages, selectedId]);
+
   if (bootError) {
     return (
       <div className="grid min-h-dvh place-items-center px-6 text-center text-sm text-[var(--color-muted)]">
@@ -392,11 +421,16 @@ export default function Messenger({ onSignOut }: Props) {
           <ChatView
             key={selected.id}
             conversation={selected}
+            messages={selectedMessages}
+            messagesSynced={messagesSynced}
             myUsername={user.username}
             mySub={user.cognitoSub}
             subToUsername={subToUsername}
             chatBackRef={chatBackRef}
-            onBack={() => setSelectedId(null)}
+            onBack={() => {
+              if (appNavigateBack()) return;
+              setSelectedId(null);
+            }}
             onConversationUpdated={handleConversationUpdated}
             onConversationRenamed={(name) =>
               handleConversationRenamed(selected.id, name)

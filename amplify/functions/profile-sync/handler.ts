@@ -4,7 +4,12 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../data/resource';
 import { env } from '$amplify/env/profile-sync';
-import { isAdminGroupMember, parseIdentity } from '../shared/cognito';
+import {
+  isAdminGroupMember,
+  parseIdentity,
+  resolveUsernameFromPool,
+  isCognitoUuid,
+} from '../shared/cognito';
 import {
   conversationIncludesUser,
   repairParticipantList,
@@ -122,9 +127,15 @@ async function consolidateProfiles(
 }
 
 export const handler: Handler = async (event) => {
-  const { username, sub } = parseIdentity(event.identity);
-  if (!username || !sub) {
+  let { username, sub } = parseIdentity(event.identity);
+  if (!sub) {
     throw new Error('Unauthorized');
+  }
+  if (!username || isCognitoUuid(username)) {
+    username = await resolveUsernameFromPool(sub);
+  }
+  if (!username) {
+    throw new Error('Could not resolve username from Cognito profile');
   }
 
   const { phoneNumber } = event.arguments;

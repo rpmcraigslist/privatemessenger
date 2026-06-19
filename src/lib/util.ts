@@ -14,6 +14,28 @@ export function fromLoginId(loginId: string): string {
   return loginId.replace(/@messenger\.local$/i, '');
 }
 
+/** Cognito internal username/sub shape — not a user handle. */
+export function isCognitoUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+/** Best-effort handle from Cognito user attributes in the browser. */
+export function usernameFromAttributes(attrs: {
+  preferred_username?: string;
+  email?: string;
+}): string | null {
+  if (attrs.preferred_username) {
+    const handle = normalizeUsername(attrs.preferred_username);
+    if (!isCognitoUuid(handle)) return handle;
+  }
+  if (attrs.email?.toLowerCase().endsWith(LOGIN_DOMAIN)) {
+    return normalizeUsername(fromLoginId(attrs.email));
+  }
+  return null;
+}
+
 /** Cognito login id stored in Conversation/Message owner fields (matches cognito:username). */
 export function toParticipantLoginId(username: string): string {
   return toLoginId(fromLoginId(username));
@@ -105,6 +127,9 @@ export function mapAuthError(err: unknown): string {
       ? String((err as { message: string }).message)
       : 'Something went wrong.';
 
+  if (name === 'UserAlreadyAuthenticatedException') {
+    return 'There is already a signed in user. Sign out first, or use a separate browser profile.';
+  }
   if (name === 'UsernameExistsException') {
     return 'That username is already in use.';
   }

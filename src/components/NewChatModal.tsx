@@ -49,6 +49,11 @@ export default function NewChatModal({
         setDirectory(profiles.filter((p) => p.username !== myUsername));
       } catch (err) {
         console.error('failed to load directory', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Could not load users. Try signing out and back in.',
+        );
       }
     })();
   }, [open, myUsername]);

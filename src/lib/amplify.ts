@@ -30,7 +30,9 @@ if (isBackendConfigured) {
 }
 
 /** Strongly-typed AppSync GraphQL client (queries, mutations, subscriptions). */
-export const client = generateClient<Schema>();
+export const client = generateClient<Schema>({
+  authMode: 'userPool',
+});
 
 export type ConversationModel = Schema['Conversation']['type'];
 export type MessageModel = Schema['Message']['type'];

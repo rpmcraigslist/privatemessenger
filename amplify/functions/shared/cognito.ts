@@ -1,5 +1,13 @@
 /** Shared Cognito helpers for admin Lambdas. */
+import {
+  CognitoIdentityProviderClient,
+  ListUsersCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
+
 export const LOGIN_DOMAIN = '@messenger.local';
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type CognitoIdentity = {
   username?: string;
@@ -7,6 +15,12 @@ type CognitoIdentity = {
   groups?: string[] | null;
   claims?: Record<string, string | string[]>;
 };
+
+const cognito = new CognitoIdentityProviderClient({});
+
+export function isCognitoUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
 
 export function toLoginId(username: string): string {
   return `${username.trim().toLowerCase()}${LOGIN_DOMAIN}`;
@@ -28,6 +42,11 @@ function claimString(
 ): string | undefined {
   const value = claims[key];
   return typeof value === 'string' ? value : undefined;
+}
+
+function usernameFromEmailClaim(email: string | undefined): string | null {
+  if (!email?.toLowerCase().endsWith(LOGIN_DOMAIN)) return null;
+  return fromLoginId(email);
 }
 
 /** Parse AppSync/Cognito identity from Lambda resolver events. */
@@ -67,13 +86,48 @@ export function parseIdentity(identity: unknown): {
     claimString(claims, 'preferred_username') ??
     claimString(claims, 'cognito:preferred_username');
 
-  const username = preferred
-    ? preferred.toLowerCase()
-    : loginId
-      ? fromLoginId(loginId)
-      : null;
+  const email = claimString(claims, 'email');
+
+  let username =
+    preferred?.toLowerCase() ??
+    usernameFromEmailClaim(email) ??
+    (loginId?.endsWith(LOGIN_DOMAIN) ? fromLoginId(loginId) : null);
+
+  if (username && isCognitoUuid(username)) {
+    username = null;
+  }
 
   return { username, loginId, sub, groups };
+}
+
+/** Resolve handle from Cognito when AppSync only passes an internal UUID. */
+export async function resolveUsernameFromPool(
+  sub: string,
+): Promise<string | null> {
+  const res = await cognito.send(
+    new ListUsersCommand({
+      UserPoolId: poolId(),
+      Filter: `sub = "${sub}"`,
+      Limit: 1,
+    }),
+  );
+
+  const user = res.Users?.[0];
+  if (!user) return null;
+
+  const attrs = Object.fromEntries(
+    (user.Attributes ?? []).map((a) => [a.Name!, a.Value!]),
+  );
+
+  const preferred = attrs.preferred_username?.toLowerCase();
+  if (preferred && !isCognitoUuid(preferred)) return preferred;
+
+  return (
+    usernameFromEmailClaim(attrs.email) ??
+    (user.Username?.toLowerCase().endsWith(LOGIN_DOMAIN)
+      ? fromLoginId(user.Username)
+      : null)
+  );
 }
 
 export function callerUsername(identity: unknown): string | null {

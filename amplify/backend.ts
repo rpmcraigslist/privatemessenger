@@ -36,6 +36,9 @@ for (const fn of cognitoAdminFns) {
   userPool.grant(fn.resources.lambda, 'cognito-idp:ListUsers');
 }
 
+backend.profileSync.addEnvironment('USER_POOL_ID', poolId);
+userPool.grant(backend.profileSync.resources.lambda, 'cognito-idp:ListUsers');
+
 userPool.grant(
   backend.bootstrapAdmin.resources.lambda,
   'cognito-idp:AdminCreateUser',

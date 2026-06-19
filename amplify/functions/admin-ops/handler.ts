@@ -58,15 +58,40 @@ function mapUser(u: UserType) {
 }
 
 async function listUserDirectory() {
+  const cognitoUsers = await listUsers();
+  for (const user of cognitoUsers) {
+    await ensureProfileStub(user.username, user.phoneNumber);
+  }
+
   const client = await dataClientPromise;
   const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
-  return profiles.data.map((p) => ({
-    id: p.id,
-    username: p.username,
-    cognitoSub: p.cognitoSub ?? null,
-    displayName: p.displayName ?? p.username,
-    avatarColor: p.avatarColor ?? null,
-  }));
+  const byUsername = new Map<
+    string,
+    {
+      id: string;
+      username: string;
+      cognitoSub: string | null;
+      displayName: string;
+      avatarColor: string | null;
+    }
+  >();
+
+  for (const profile of profiles.data) {
+    if (!/^[a-z0-9._-]{3,32}$/.test(profile.username)) continue;
+    const existing = byUsername.get(profile.username);
+    const entry = {
+      id: profile.id,
+      username: profile.username,
+      cognitoSub: profile.cognitoSub ?? null,
+      displayName: profile.displayName ?? profile.username,
+      avatarColor: profile.avatarColor ?? null,
+    };
+    if (!existing || (!existing.cognitoSub && entry.cognitoSub)) {
+      byUsername.set(profile.username, entry);
+    }
+  }
+
+  return [...byUsername.values()];
 }
 
 async function ensureProfileStub(

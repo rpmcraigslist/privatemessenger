@@ -1,14 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { client, type ConversationModel } from '../lib/amplify';
+import {
+  clearUnreadIndicators,
+  playMessageSound,
+  setNotificationClickHandler,
+  shouldAlertForIncomingMessage,
+  showMessageNotification,
+  syncUnreadIndicators,
+  unlockNotificationSound,
+} from '../lib/app-notifications';
 import { loadUserDirectory } from '../lib/directory';
 import { fetchUnreadCount, getLastReadAt } from '../lib/read-state';
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
-import { buildParticipantDirectory, messageListPreview } from '../lib/util';
+import {
+  buildParticipantDirectory,
+  conversationTitle,
+  isSameMessengerUser,
+  messageListPreview,
+} from '../lib/util';
 import ConversationList from './ConversationList';
 import ChatView from './ChatView';
 import NewChatModal from './NewChatModal';
 import AdminPanel from './AdminPanel';
 import ProfileSettings from './ProfileSettings';
+import NotificationPrompt from './NotificationPrompt';
 
 type Props = {
   onSignOut: () => void;
@@ -48,6 +63,19 @@ export default function Messenger({ onSignOut }: Props) {
   const [latestByConversation, setLatestByConversation] = useState<
     Map<string, LatestMessagePreview>
   >(() => new Map());
+
+  const selectedIdRef = useRef<string | null>(null);
+  const userRef = useRef<SessionUser | null>(null);
+  const subToUsernameRef = useRef(subToUsername);
+  const conversationsRef = useRef<Map<string, ConversationModel>>(new Map());
+  const knownMessageIdsRef = useRef(new Set<string>());
+  const messageSyncReadyRef = useRef(false);
+  const refreshUnreadCountsRef = useRef<(() => Promise<void>) | null>(null);
+
+  selectedIdRef.current = selectedId;
+  userRef.current = user;
+  subToUsernameRef.current = subToUsername;
+  conversationsRef.current = new Map(conversations.map((c) => [c.id, c]));
 
   useEffect(() => {
     let active = true;
@@ -98,8 +126,11 @@ export default function Messenger({ onSignOut }: Props) {
 
   useEffect(() => {
     if (!user) return;
+    knownMessageIdsRef.current.clear();
+    messageSyncReadyRef.current = false;
+
     const sub = client.models.Message.observeQuery().subscribe({
-      next: ({ items }) => {
+      next: ({ items, isSynced }) => {
         const next = new Map<string, LatestMessagePreview>();
         for (const message of items) {
           if (!message.conversationId) continue;
@@ -116,6 +147,65 @@ export default function Messenger({ onSignOut }: Props) {
           });
         }
         setLatestByConversation(next);
+
+        if (!isSynced) return;
+
+        const currentUser = userRef.current;
+        if (!currentUser) return;
+
+        if (!messageSyncReadyRef.current) {
+          for (const message of items) {
+            knownMessageIdsRef.current.add(message.id);
+          }
+          messageSyncReadyRef.current = true;
+          return;
+        }
+
+        for (const message of items) {
+          if (knownMessageIdsRef.current.has(message.id)) continue;
+          knownMessageIdsRef.current.add(message.id);
+          if (!message.conversationId) continue;
+
+          if (
+            isSameMessengerUser(
+              message.senderUsername,
+              currentUser.username,
+              currentUser.cognitoSub,
+              subToUsernameRef.current,
+            )
+          ) {
+            continue;
+          }
+
+          if (
+            !shouldAlertForIncomingMessage({
+              conversationId: message.conversationId,
+              selectedConversationId: selectedIdRef.current,
+            })
+          ) {
+            continue;
+          }
+
+          const conversation = conversationsRef.current.get(message.conversationId);
+          const title = conversation
+            ? conversationTitle(
+                conversation.participants,
+                conversation.name,
+                currentUser.cognitoSub,
+                currentUser.username,
+                subToUsernameRef.current,
+              )
+            : 'New message';
+
+          playMessageSound();
+          showMessageNotification({
+            conversationId: message.conversationId,
+            title,
+            body: messageListPreview(message),
+          });
+        }
+
+        void refreshUnreadCountsRef.current?.();
       },
       error: (err) => {
         console.error('message preview subscription error', err);
@@ -154,6 +244,8 @@ export default function Messenger({ onSignOut }: Props) {
     setUnreadCounts(new Map(entries));
   }, [conversations, selectedId, subToUsername, user]);
 
+  refreshUnreadCountsRef.current = refreshUnreadCounts;
+
   const handleConversationUpdated = useCallback(() => {
     void refreshUnreadCounts();
   }, [refreshUnreadCounts]);
@@ -164,7 +256,35 @@ export default function Messenger({ onSignOut }: Props) {
       return;
     }
     void refreshUnreadCounts();
-  }, [conversations, refreshUnreadCounts, user]);
+  }, [conversations, latestByConversation, refreshUnreadCounts, user]);
+
+  const totalUnread = useMemo(
+    () =>
+      Array.from(unreadCounts.values()).reduce((sum, count) => sum + count, 0),
+    [unreadCounts],
+  );
+
+  useEffect(() => {
+    void syncUnreadIndicators(totalUnread);
+  }, [totalUnread]);
+
+  useEffect(() => {
+    setNotificationClickHandler((conversationId) => {
+      setSelectedId(conversationId);
+    });
+    return () => {
+      setNotificationClickHandler(null);
+      void clearUnreadIndicators();
+    };
+  }, []);
+
+  useEffect(() => {
+    function unlockOnInteraction() {
+      unlockNotificationSound();
+    }
+    window.addEventListener('pointerdown', unlockOnInteraction, { once: true });
+    return () => window.removeEventListener('pointerdown', unlockOnInteraction);
+  }, []);
 
   const selected = useMemo(
     () => conversations.find((c) => c.id === selectedId) ?? null,
@@ -259,6 +379,8 @@ export default function Messenger({ onSignOut }: Props) {
           }
         />
       )}
+
+      <NotificationPrompt />
     </div>
   );
 }

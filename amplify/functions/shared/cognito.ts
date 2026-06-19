@@ -130,6 +130,23 @@ export async function resolveUsernameFromPool(
   );
 }
 
+/** Resolve caller handle from AppSync identity, including Cognito pool lookup by sub. */
+export async function resolveCallerIdentity(identity: unknown): Promise<{
+  username: string | null;
+  loginId: string | null;
+  sub: string | null;
+  groups: string[];
+}> {
+  const parsed = parseIdentity(identity);
+  let { username, loginId, sub, groups } = parsed;
+
+  if (sub && (!username || isCognitoUuid(username))) {
+    username = await resolveUsernameFromPool(sub);
+  }
+
+  return { username, loginId, sub, groups };
+}
+
 export function callerUsername(identity: unknown): string | null {
   return parseIdentity(identity).username;
 }

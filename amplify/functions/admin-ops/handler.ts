@@ -12,7 +12,13 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../data/resource';
 import { env } from '$amplify/env/admin-ops';
-import { callerUsername, fromLoginId, isAdminGroupMember, parseIdentity, poolId, toLoginId } from '../shared/cognito';
+import {
+  fromLoginId,
+  isAdminGroupMember,
+  poolId,
+  resolveCallerIdentity,
+  toLoginId,
+} from '../shared/cognito';
 
 const cognito = new CognitoIdentityProviderClient({});
 const dataClientPromise = getAmplifyDataClientConfig(
@@ -23,23 +29,42 @@ const dataClientPromise = getAmplifyDataClientConfig(
 });
 
 async function assertAdmin(identity: unknown): Promise<string> {
-  const { username } = parseIdentity(identity);
-  if (!username) throw new Error('Unauthorized');
+  const { username, sub } = await resolveCallerIdentity(identity);
+  if (!sub && !username) {
+    throw new Error('Unauthorized');
+  }
 
   if (isAdminGroupMember(identity)) {
+    if (!username) {
+      throw new Error('Could not resolve admin username');
+    }
     return username;
   }
 
   const client = await dataClientPromise;
-  const profiles = await client.models.UserProfile.list({
-    filter: { username: { eq: username } },
-    authMode: 'iam',
-  });
 
-  if (profiles.data[0]?.role !== 'admin') {
-    throw new Error('Admin access required');
+  if (sub) {
+    const bySub = await client.models.UserProfile.list({
+      filter: { cognitoSub: { eq: sub } },
+      authMode: 'iam',
+    });
+    const profile = bySub.data[0];
+    if (profile?.role === 'admin') {
+      return profile.username ?? username ?? sub;
+    }
   }
-  return username;
+
+  if (username) {
+    const byUsername = await client.models.UserProfile.list({
+      filter: { username: { eq: username } },
+      authMode: 'iam',
+    });
+    if (byUsername.data[0]?.role === 'admin') {
+      return username;
+    }
+  }
+
+  throw new Error('Admin access required');
 }
 
 function mapUser(u: UserType) {
@@ -162,8 +187,8 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
   const field = resolveFieldName(event);
 
   if (field === 'listUserDirectory') {
-    const { username } = parseIdentity(event.identity);
-    if (!username) throw new Error('Unauthorized');
+    const { username, sub } = await resolveCallerIdentity(event.identity);
+    if (!username && !sub) throw new Error('Unauthorized');
     return listUserDirectory();
   }
 

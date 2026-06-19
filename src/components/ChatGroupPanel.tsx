@@ -48,6 +48,7 @@ export default function ChatGroupPanel({
       });
       if (errors?.length) throw new Error(errors[0].message);
       onRenamed(trimmed || null);
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save group name');
     } finally {

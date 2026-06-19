@@ -24,6 +24,8 @@ import NewChatModal from './NewChatModal';
 import AdminPanel from './AdminPanel';
 import ProfileSettings from './ProfileSettings';
 import NotificationPrompt from './NotificationPrompt';
+import { useStandaloneBackGuard } from '../lib/back-navigation';
+import type { ChatBackHandle } from './ChatView';
 
 type Props = {
   onSignOut: () => void;
@@ -71,11 +73,46 @@ export default function Messenger({ onSignOut }: Props) {
   const knownMessageIdsRef = useRef(new Set<string>());
   const messageSyncReadyRef = useRef(false);
   const refreshUnreadCountsRef = useRef<(() => Promise<void>) | null>(null);
+  const chatBackRef = useRef<ChatBackHandle | null>(null);
+  const uiStateRef = useRef({
+    showNewChat: false,
+    showAdmin: false,
+    showProfile: false,
+    selectedId: null as string | null,
+  });
 
   selectedIdRef.current = selectedId;
   userRef.current = user;
   subToUsernameRef.current = subToUsername;
   conversationsRef.current = new Map(conversations.map((c) => [c.id, c]));
+  uiStateRef.current = {
+    showNewChat,
+    showAdmin,
+    showProfile,
+    selectedId,
+  };
+
+  useStandaloneBackGuard(() => {
+    if (chatBackRef.current?.handleBack()) return true;
+    const ui = uiStateRef.current;
+    if (ui.showNewChat) {
+      setShowNewChat(false);
+      return true;
+    }
+    if (ui.showProfile) {
+      setShowProfile(false);
+      return true;
+    }
+    if (ui.showAdmin) {
+      setShowAdmin(false);
+      return true;
+    }
+    if (ui.selectedId) {
+      setSelectedId(null);
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     let active = true;
@@ -250,6 +287,15 @@ export default function Messenger({ onSignOut }: Props) {
     void refreshUnreadCounts();
   }, [refreshUnreadCounts]);
 
+  const handleConversationRenamed = useCallback(
+    (conversationId: string, name: string | null) => {
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversationId ? { ...c, name } : c)),
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!user || conversations.length === 0) {
       setUnreadCounts(new Map());
@@ -257,6 +303,11 @@ export default function Messenger({ onSignOut }: Props) {
     }
     void refreshUnreadCounts();
   }, [conversations, latestByConversation, refreshUnreadCounts, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void refreshUnreadCounts();
+  }, [selectedId, refreshUnreadCounts, user]);
 
   const totalUnread = useMemo(
     () =>
@@ -344,8 +395,12 @@ export default function Messenger({ onSignOut }: Props) {
             myUsername={user.username}
             mySub={user.cognitoSub}
             subToUsername={subToUsername}
+            chatBackRef={chatBackRef}
             onBack={() => setSelectedId(null)}
             onConversationUpdated={handleConversationUpdated}
+            onConversationRenamed={(name) =>
+              handleConversationRenamed(selected.id, name)
+            }
           />
         ) : (
           <EmptyState />

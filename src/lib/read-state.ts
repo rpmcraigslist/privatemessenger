@@ -22,6 +22,18 @@ export function markConversationRead(
   localStorage.setItem(storageKey(sub, conversationId), readAtIso);
 }
 
+/** True when lastReadAt covers messageCreatedAt (timestamp-safe). */
+export function isReadThrough(
+  lastReadAt: string | null,
+  messageCreatedAt: string,
+): boolean {
+  if (!lastReadAt) return false;
+  const readMs = new Date(lastReadAt).getTime();
+  const messageMs = new Date(messageCreatedAt).getTime();
+  if (Number.isNaN(readMs) || Number.isNaN(messageMs)) return false;
+  return readMs >= messageMs;
+}
+
 export function countUnreadMessages(
   messages: MessageModel[],
   lastReadAt: string | null,
@@ -29,7 +41,6 @@ export function countUnreadMessages(
   mySub: string,
   subToUsername: Map<string, string>,
 ): number {
-  const lastReadMs = lastReadAt ? new Date(lastReadAt).getTime() : 0;
   return messages.filter((message) => {
     if (
       isSameMessengerUser(
@@ -41,7 +52,8 @@ export function countUnreadMessages(
     ) {
       return false;
     }
-    return new Date(message.createdAt).getTime() > lastReadMs;
+    if (!message.createdAt) return false;
+    return !isReadThrough(lastReadAt, message.createdAt);
   }).length;
 }
 

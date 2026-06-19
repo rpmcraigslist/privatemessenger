@@ -80,10 +80,8 @@ export const handler: Handler = async (event) => {
   let skipped = 0;
 
   for (const participantId of participantUsernames ?? []) {
-    if (
-      !participantId ||
-      isParticipantSender(participantId, callerSub, callerUsername)
-    ) {
+    if (!participantId) continue;
+    if (isParticipantSender(participantId, callerSub, callerUsername)) {
       continue;
     }
 
@@ -114,6 +112,10 @@ export const handler: Handler = async (event) => {
         }),
       );
       sent++;
+      console.info('sendMessageAlerts: SMS sent', {
+        participantId,
+        phone: target.phone.replace(/\d(?=\d{4})/g, '*'),
+      });
     } catch (err) {
       failed++;
       console.error('sendMessageAlerts: SMS failed', {
@@ -123,6 +125,14 @@ export const handler: Handler = async (event) => {
       });
     }
   }
+
+  console.info('sendMessageAlerts: done', {
+    messageId,
+    sent,
+    failed,
+    skipped,
+    participantCount: participantUsernames?.length ?? 0,
+  });
 
   return { sent, failed, skipped, conversationId: message.conversationId ?? undefined };
 };

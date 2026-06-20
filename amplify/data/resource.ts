@@ -98,6 +98,11 @@ const schema = a
       deletedConversations: a.integer().required(),
     }),
 
+    DeleteMyMessageResult: a.customType({
+      messageId: a.string().required(),
+      deleted: a.boolean().required(),
+    }),
+
     MessageAlertsResult: a.customType({
       sent: a.integer().required(),
       failed: a.integer(),
@@ -189,6 +194,13 @@ const schema = a
     adminClearMessages: a
       .mutation()
       .returns(a.ref('AdminClearMessagesResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    deleteMyMessage: a
+      .mutation()
+      .arguments({ messageId: a.id().required() })
+      .returns(a.ref('DeleteMyMessageResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

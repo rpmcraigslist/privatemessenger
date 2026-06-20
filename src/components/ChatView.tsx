@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 
-import { type ConversationModel, type MessageModel } from '../lib/amplify';
+import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 
 import { getLastReadAt, isReadThrough, markConversationRead } from '../lib/read-state';
 
@@ -61,6 +61,24 @@ type Props = {
 
   onConversationRenamed: (name: string | null) => void;
 
+  onMessageCreated?: (message: MessageModel) => void;
+
+  onMessageDeleted?: (messageId: string) => void;
+
+};
+
+
+
+type MessageMenuState = {
+
+  message: MessageModel;
+
+  mine: boolean;
+
+  x: number;
+
+  y: number;
+
 };
 
 
@@ -91,6 +109,10 @@ export default function ChatView({
 
   onConversationRenamed,
 
+  onMessageCreated,
+
+  onMessageDeleted,
+
 }: Props) {
 
   const [showDetails, setShowDetails] = useState(false);
@@ -104,6 +126,12 @@ export default function ChatView({
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
 
   const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+
+  const [messageMenu, setMessageMenu] = useState<MessageMenuState | null>(null);
+
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
+
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!chatBackRef) return;
@@ -123,6 +151,10 @@ export default function ChatView({
           setReplyTo(null);
           return true;
         }
+        if (messageMenu) {
+          setMessageMenu(null);
+          return true;
+        }
         return false;
       },
     };
@@ -130,7 +162,7 @@ export default function ChatView({
     return () => {
       chatBackRef.current = null;
     };
-  }, [chatBackRef, replyTo, searchOpen, showDetails]);
+  }, [chatBackRef, messageMenu, replyTo, searchOpen, showDetails]);
 
   const overlayNavRef = useRef({
     showDetails: false,
@@ -284,7 +316,99 @@ export default function ChatView({
 
     setReplyTo(null);
 
+    setMessageMenu(null);
+
   }, [conversation.id]);
+
+
+
+  useEffect(() => {
+
+    if (!messageMenu) return;
+
+    function closeMenu() {
+
+      setMessageMenu(null);
+
+    }
+
+    window.addEventListener('pointerdown', closeMenu);
+
+    window.addEventListener('scroll', closeMenu, true);
+
+    return () => {
+
+      window.removeEventListener('pointerdown', closeMenu);
+
+      window.removeEventListener('scroll', closeMenu, true);
+
+    };
+
+  }, [messageMenu]);
+
+
+
+  const openMessageMenu = useCallback(
+
+    (message: MessageModel, mine: boolean, x: number, y: number) => {
+
+      setActionError(null);
+
+      setMessageMenu({ message, mine, x, y });
+
+    },
+
+    [],
+
+  );
+
+
+
+  const handleDeleteMessage = useCallback(
+
+    async (message: MessageModel) => {
+
+      setMessageMenu(null);
+
+      setDeleteBusyId(message.id);
+
+      setActionError(null);
+
+      try {
+
+        const { data, errors } = await client.mutations.deleteMyMessage({
+
+          messageId: message.id,
+
+        });
+
+        if (errors?.length) throw new Error(errors[0].message);
+
+        if (!data?.deleted) throw new Error('Delete failed');
+
+        onMessageDeleted?.(message.id);
+
+      } catch (err) {
+
+        console.error('delete message failed', err);
+
+        setActionError(
+
+          err instanceof Error ? err.message : 'Could not delete message',
+
+        );
+
+      } finally {
+
+        setDeleteBusyId(null);
+
+      }
+
+    },
+
+    [onMessageDeleted],
+
+  );
 
 
 
@@ -896,9 +1020,11 @@ export default function ChatView({
 
                     searchQuery={hasSearch && isSearchHit ? trimmedSearch : ''}
 
+                    deleting={deleteBusyId === m.id}
+
                     onLayout={pinToBottom}
 
-                    onReply={() => setReplyTo(replyTargetFromMessage(m))}
+                    onOpenMenu={(x, y) => openMessageMenu(m, mine, x, y)}
 
                     onQuoteClick={
 
@@ -926,6 +1052,40 @@ export default function ChatView({
 
 
 
+      {actionError && (
+
+        <p className="border-t border-black/30 bg-[var(--color-panel)] px-3 py-1.5 text-xs text-red-400">
+
+          {actionError}
+
+        </p>
+
+      )}
+
+
+
+      {messageMenu && (
+
+        <MessageActionMenu
+
+          menu={messageMenu}
+
+          onReply={() => {
+
+            setReplyTo(replyTargetFromMessage(messageMenu.message));
+
+            setMessageMenu(null);
+
+          }}
+
+          onDelete={() => void handleDeleteMessage(messageMenu.message)}
+
+        />
+
+      )}
+
+
+
       <MessageComposer
 
         conversation={conversation}
@@ -939,6 +1099,8 @@ export default function ChatView({
         onCancelReply={() => setReplyTo(null)}
 
         onSent={handleMessageSent}
+
+        onMessageCreated={onMessageCreated}
 
       />
 
@@ -1018,6 +1180,110 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 
 
 
+function MessageActionMenu({
+
+  menu,
+
+  onReply,
+
+  onDelete,
+
+}: {
+
+  menu: MessageMenuState;
+
+  onReply: () => void;
+
+  onDelete: () => void;
+
+}) {
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+
+
+  useEffect(() => {
+
+    const el = menuRef.current;
+
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+
+    const maxX = window.innerWidth - rect.width - 8;
+
+    const maxY = window.innerHeight - rect.height - 8;
+
+    if (rect.right > window.innerWidth - 8) {
+
+      el.style.left = `${Math.max(8, maxX)}px`;
+
+    }
+
+    if (rect.bottom > window.innerHeight - 8) {
+
+      el.style.top = `${Math.max(8, maxY)}px`;
+
+    }
+
+  }, [menu.x, menu.y]);
+
+
+
+  return (
+
+    <div
+
+      ref={menuRef}
+
+      className="fixed z-50 min-w-[140px] overflow-hidden rounded-lg border border-white/10 bg-[var(--color-panel)] py-1 shadow-xl"
+
+      style={{ left: menu.x, top: menu.y }}
+
+      onPointerDown={(e) => e.stopPropagation()}
+
+    >
+
+      <button
+
+        type="button"
+
+        onClick={onReply}
+
+        className="flex w-full px-4 py-2.5 text-left text-sm hover:bg-white/10"
+
+      >
+
+        Reply
+
+      </button>
+
+      {menu.mine && (
+
+        <button
+
+          type="button"
+
+          onClick={onDelete}
+
+          className="flex w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/10"
+
+        >
+
+          Delete
+
+        </button>
+
+      )}
+
+    </div>
+
+  );
+
+}
+
+
+
 function Bubble({
 
   message,
@@ -1030,9 +1296,11 @@ function Bubble({
 
   searchQuery,
 
+  deleting,
+
   onLayout,
 
-  onReply,
+  onOpenMenu,
 
   onQuoteClick,
 
@@ -1048,15 +1316,21 @@ function Bubble({
 
   searchQuery: string;
 
+  deleting?: boolean;
+
   onLayout?: () => void;
 
-  onReply: () => void;
+  onOpenMenu: (x: number, y: number) => void;
 
   onQuoteClick?: () => void;
 
 }) {
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const longPressTriggeredRef = useRef(false);
+
+
 
   function clearLongPress() {
 
@@ -1070,13 +1344,19 @@ function Bubble({
 
   }
 
-  function startLongPress() {
+
+
+  function startLongPress(clientX: number, clientY: number) {
 
     clearLongPress();
 
+    longPressTriggeredRef.current = false;
+
     longPressTimerRef.current = setTimeout(() => {
 
-      onReply();
+      longPressTriggeredRef.current = true;
+
+      onOpenMenu(clientX, clientY);
 
       navigator.vibrate?.(12);
 
@@ -1084,9 +1364,21 @@ function Bubble({
 
   }
 
+
+
+  function handleContextMenu(e: React.MouseEvent) {
+
+    e.preventDefault();
+
+    onOpenMenu(e.clientX, e.clientY);
+
+  }
+
+
+
   return (
 
-    <div className={`flex ${mine ? 'justify-start' : 'justify-end'}`}>
+    <div className={`flex ${mine ? 'justify-end' : 'justify-start'} ${deleting ? 'opacity-50' : ''}`}>
 
       <div
 
@@ -1102,7 +1394,15 @@ function Bubble({
 
         }}
 
-        onTouchStart={startLongPress}
+        onContextMenu={handleContextMenu}
+
+        onTouchStart={(e) => {
+
+          const touch = e.touches[0];
+
+          if (touch) startLongPress(touch.clientX, touch.clientY);
+
+        }}
 
         onTouchEnd={clearLongPress}
 
@@ -1222,15 +1522,27 @@ function Bubble({
 
             type="button"
 
-            onClick={onReply}
+            onClick={(e) => {
+
+              if (longPressTriggeredRef.current) {
+
+                longPressTriggeredRef.current = false;
+
+                return;
+
+              }
+
+              onOpenMenu(e.clientX, e.clientY - 48);
+
+            }}
 
             className="text-[10px] font-medium text-[var(--color-accent)] hover:underline"
 
-            aria-label="Reply to message"
+            aria-label="Message actions"
 
           >
 
-            Reply
+            ···
 
           </button>
 

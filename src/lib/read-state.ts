@@ -57,6 +57,7 @@ export function countUnreadMessages(
   }).length;
 }
 
+/** @deprecated Prefer computeUnreadCounts with in-memory messages. */
 export async function fetchUnreadCount(
   conversationId: string,
   lastReadAt: string | null,
@@ -75,4 +76,18 @@ export async function fetchUnreadCount(
     mySub,
     subToUsername,
   );
+}
+
+/** Latest read cursor for a conversation (max of stored cursor and message timestamps). */
+export function readCursorForMessages(
+  lastReadAt: string | null,
+  messages: { createdAt?: string | null }[],
+): string | null {
+  if (messages.length === 0) return lastReadAt;
+  const latest = messages[messages.length - 1]?.createdAt;
+  if (!latest) return lastReadAt;
+  if (!lastReadAt) return latest;
+  return new Date(latest).getTime() >= new Date(lastReadAt).getTime()
+    ? latest
+    : lastReadAt;
 }

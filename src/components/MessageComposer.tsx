@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { uploadData } from 'aws-amplify/storage';
-import { client, type ConversationModel } from '../lib/amplify';
+import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 import {
   formatBytes,
   messageListPreview,
@@ -15,6 +15,7 @@ type Props = {
   replyTo?: ReplyTarget | null;
   onCancelReply?: () => void;
   onSent?: () => void;
+  onMessageCreated?: (message: MessageModel) => void;
 };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB guardrail.
@@ -26,6 +27,7 @@ export default function MessageComposer({
   replyTo,
   onCancelReply,
   onSent,
+  onMessageCreated,
 }: Props) {
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -78,7 +80,7 @@ export default function MessageComposer({
         (p): p is string => !!p,
       );
 
-      const { data: created } = await client.models.Message.create({
+      const { data: created, errors: createErrors } = await client.models.Message.create({
         conversationId: conversation.id,
         content: body || undefined,
         senderUsername: myUsername,
@@ -94,6 +96,14 @@ export default function MessageComposer({
             }
           : {}),
       });
+
+      if (createErrors?.length) {
+        throw new Error(createErrors[0].message);
+      }
+
+      if (created) {
+        onMessageCreated?.(created);
+      }
 
       if (created?.id) {
         try {

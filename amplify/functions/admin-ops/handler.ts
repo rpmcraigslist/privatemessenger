@@ -78,15 +78,125 @@ function mapUser(u: UserType) {
   return {
     loginId: u.Username ?? '',
     username,
+    cognitoSub: attrs.sub ?? null,
     phoneNumber: attrs.phone_number ?? null,
     status: u.UserStatus ?? 'UNKNOWN',
   };
 }
 
-async function listUserDirectory() {
+type MappedCognitoUser = ReturnType<typeof mapUser>;
+type UserProfileRow = Schema['UserProfile']['type'];
+
+async function syncProfileForCognitoUser(
+  user: MappedCognitoUser,
+): Promise<void> {
+  const handle = user.username.trim().toLowerCase();
+  if (!/^[a-z0-9._-]{3,32}$/.test(handle) || isCognitoUuid(handle)) return;
+
+  const client = await dataClientPromise;
+  const byUsername = await client.models.UserProfile.list({
+    filter: { username: { eq: handle } },
+    authMode: 'iam',
+  });
+
+  const related = new Map<string, UserProfileRow>();
+  for (const profile of byUsername.data) {
+    related.set(profile.id, profile);
+  }
+
+  if (user.cognitoSub) {
+    const bySub = await client.models.UserProfile.list({
+      filter: { cognitoSub: { eq: user.cognitoSub } },
+      authMode: 'iam',
+    });
+    for (const profile of bySub.data) {
+      related.set(profile.id, profile);
+    }
+
+    const byLegacyUsername = await client.models.UserProfile.list({
+      filter: { username: { eq: user.cognitoSub } },
+      authMode: 'iam',
+    });
+    for (const profile of byLegacyUsername.data) {
+      related.set(profile.id, profile);
+    }
+  }
+
+  const profiles = [...related.values()];
+
+  if (profiles.length === 0) {
+    await client.models.UserProfile.create(
+      {
+        username: handle,
+        cognitoSub: user.cognitoSub,
+        displayName: handle,
+        role: 'user',
+        phoneNumber: user.phoneNumber?.trim() || null,
+        avatarColor: '#64b5f6',
+      },
+      { authMode: 'iam' },
+    );
+    return;
+  }
+
+  const keeper =
+    profiles.find((p) => p.username === handle && p.cognitoSub === user.cognitoSub) ??
+    profiles.find((p) => p.username === handle && p.cognitoSub) ??
+    profiles.find((p) => p.username === handle) ??
+    profiles.find((p) => p.cognitoSub === user.cognitoSub) ??
+    profiles[0];
+
+  for (const profile of profiles) {
+    if (profile.id !== keeper.id) {
+      await client.models.UserProfile.delete(
+        { id: profile.id },
+        { authMode: 'iam' },
+      );
+    }
+  }
+
+  const rawTitle = keeper.displayName?.trim();
+  const displayName =
+    rawTitle && !isCognitoUuid(rawTitle) ? rawTitle : handle;
+
+  await client.models.UserProfile.update(
+    {
+      id: keeper.id,
+      username: handle,
+      cognitoSub: user.cognitoSub ?? keeper.cognitoSub,
+      displayName,
+      phoneNumber: user.phoneNumber?.trim() || keeper.phoneNumber,
+    },
+    { authMode: 'iam' },
+  );
+}
+
+function isMessageSender(
+  senderUsername: string,
+  callerSub: string | null,
+  callerUsername: string | null,
+): boolean {
+  const sender = senderUsername.trim().toLowerCase();
+  if (callerSub && sender === callerSub.toLowerCase()) return true;
+  if (!callerUsername) return false;
+  const handle = callerUsername.trim().toLowerCase();
+  if (sender === handle) return true;
+  if (sender === toLoginId(handle).toLowerCase()) return true;
+  return fromLoginId(sender) === handle;
+}
+
+type DirectoryEntry = {
+  id: string;
+  username: string;
+  cognitoSub: string | null;
+  displayName: string;
+  avatarColor: string | null;
+};
+
+async function listUserDirectory(): Promise<DirectoryEntry[]> {
   const cognitoUsers = await listUsers();
   for (const user of cognitoUsers) {
-    await ensureProfileStub(user.username, user.phoneNumber);
+    await syncProfileForCognitoUser(user);
   }
 
   const client = await dataClientPromise;
@@ -101,12 +211,12 @@ async function listUserDirectory() {
       avatarColor: string | null;
     }
   >();
+  const bySub = new Map<string, (typeof byUsername extends Map<string, infer V> ? V : never)>();
 
   for (const profile of profiles.data) {
     if (!/^[a-z0-9._-]{3,32}$/.test(profile.username)) continue;
     if (isCognitoUuid(profile.username)) continue;
     if (profile.cognitoSub && profile.username === profile.cognitoSub) continue;
-    const existing = byUsername.get(profile.username);
     const rawTitle = profile.displayName?.trim();
     const displayName =
       rawTitle && !isCognitoUuid(rawTitle) ? rawTitle : profile.username;
@@ -117,12 +227,39 @@ async function listUserDirectory() {
       displayName,
       avatarColor: profile.avatarColor ?? null,
     };
-    if (!existing || (!existing.cognitoSub && entry.cognitoSub)) {
+
+    const existingByUsername = byUsername.get(profile.username);
+    if (!existingByUsername || (!existingByUsername.cognitoSub && entry.cognitoSub)) {
       byUsername.set(profile.username, entry);
+    }
+
+    if (entry.cognitoSub) {
+      const existingBySub = bySub.get(entry.cognitoSub);
+      if (!existingBySub || (!existingBySub.cognitoSub && entry.cognitoSub)) {
+        bySub.set(entry.cognitoSub, entry);
+      }
     }
   }
 
-  return [...byUsername.values()];
+  const seen = new Set<string>();
+  const result: DirectoryEntry[] = [];
+
+  for (const entry of bySub.values()) {
+    const canonical = byUsername.get(entry.username) ?? entry;
+    const key = entry.cognitoSub!;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(canonical);
+  }
+
+  for (const entry of byUsername.values()) {
+    const key = entry.cognitoSub ?? entry.username;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(entry);
+  }
+
+  return result;
 }
 
 async function ensureProfileStub(
@@ -173,6 +310,7 @@ type AdminEvent = {
     temporaryPassword?: string;
     phoneNumber?: string | null;
     forcePasswordChange?: boolean | null;
+    messageId?: string;
   };
 };
 
@@ -196,6 +334,28 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
     const { username, sub } = await resolveCallerIdentity(event.identity);
     if (!username && !sub) throw new Error('Unauthorized');
     return listUserDirectory();
+  }
+
+  if (field === 'deleteMyMessage') {
+    const messageId = event.arguments.messageId;
+    if (!messageId) throw new Error('messageId is required');
+
+    const { username, sub } = await resolveCallerIdentity(event.identity);
+    if (!sub) throw new Error('Unauthorized');
+
+    const client = await dataClientPromise;
+    const { data: message } = await client.models.Message.get(
+      { id: messageId },
+      { authMode: 'iam' },
+    );
+    if (!message) throw new Error('Message not found');
+
+    if (!isMessageSender(message.senderUsername, sub, username)) {
+      throw new Error('You can only delete your own messages');
+    }
+
+    await client.models.Message.delete({ id: messageId }, { authMode: 'iam' });
+    return { messageId, deleted: true };
   }
 
   const actor = await assertAdmin(event.identity);
@@ -246,6 +406,12 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
 
       await ensureProfileStub(handle, phoneNumber);
 
+      const createdUsers = await listUsers();
+      const created = createdUsers.find((u) => u.username === handle);
+      if (created) {
+        await syncProfileForCognitoUser(created);
+      }
+
       return {
         username: handle,
         forcePasswordChange: forcePasswordChange !== false,
@@ -288,6 +454,13 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
           Permanent: false,
         }),
       );
+
+      const users = await listUsers();
+      const target = users.find((u) => u.username === handle);
+      if (target) {
+        await syncProfileForCognitoUser(target);
+      }
+
       return {
         username: handle,
         message: `${handle} must change password on next sign-in.`,

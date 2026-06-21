@@ -103,60 +103,28 @@ function pickPreferredProfile<
     : existing;
 }
 
-/** One directory row per person; prefer signed-in profiles with valid handles. */
+/** One directory row per username; prefer signed-in profiles with valid handles. */
 export function dedupeUserProfiles<
   T extends { username: string; cognitoSub?: string | null },
 >(profiles: T[]): T[] {
-  const candidates = profiles.filter((profile) => {
-    const handle = normalizeProfileHandle(profile.username);
-    if (!handle) return false;
-    if (profile.cognitoSub && profile.username === profile.cognitoSub) {
-      return false;
-    }
-    return true;
-  });
-
   const byHandle = new Map<string, T>();
-  const bySub = new Map<string, T>();
 
-  for (const profile of candidates) {
-    const handle = normalizeProfileHandle(profile.username)!;
+  for (const profile of profiles) {
+    const handle = normalizeProfileHandle(profile.username);
+    if (!handle) continue;
+    if (profile.cognitoSub && profile.username === profile.cognitoSub) {
+      continue;
+    }
+
     byHandle.set(
       handle,
       byHandle.has(handle)
         ? pickPreferredProfile(byHandle.get(handle)!, profile)
         : profile,
     );
-    if (profile.cognitoSub) {
-      bySub.set(
-        profile.cognitoSub,
-        bySub.has(profile.cognitoSub)
-          ? pickPreferredProfile(bySub.get(profile.cognitoSub)!, profile)
-          : profile,
-      );
-    }
   }
 
-  const seen = new Set<string>();
-  const result: T[] = [];
-
-  for (const profile of bySub.values()) {
-    const handle = normalizeProfileHandle(profile.username);
-    const canonical = handle ? (byHandle.get(handle) ?? profile) : profile;
-    const key = profile.cognitoSub!;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(canonical);
-  }
-
-  for (const profile of byHandle.values()) {
-    const key = profile.cognitoSub ?? normalizeProfileHandle(profile.username)!;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(profile);
-  }
-
-  return result;
+  return [...byHandle.values()];
 }
 
 export function usernameError(value: string): string | null {

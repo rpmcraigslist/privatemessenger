@@ -33,6 +33,17 @@ describe('dedupeUserProfiles', () => {
 
     expect(result).toHaveLength(1);
   });
+
+  it('never shows two rows for the same username with different subs', () => {
+    const result = dedupeUserProfiles([
+      { username: 'lena', cognitoSub: 'sub-real', id: '1' },
+      { username: 'lena', cognitoSub: 'sub-stale', id: '2' },
+      { username: 'lena', cognitoSub: null, id: '3' },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.cognitoSub).toBe('sub-real');
+  });
 });
 
 describe('isSameMessengerUser', () => {

@@ -13,6 +13,10 @@ import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../data/resource';
 import { env } from '$amplify/env/admin-ops';
 import {
+  ensureProfileForCognitoUser,
+  isValidMessengerHandle,
+} from '../shared/profile-consolidation';
+import {
   fromLoginId,
   isAdminGroupMember,
   isCognitoUuid,
@@ -85,91 +89,6 @@ function mapUser(u: UserType) {
 }
 
 type MappedCognitoUser = ReturnType<typeof mapUser>;
-type UserProfileRow = Schema['UserProfile']['type'];
-
-async function syncProfileForCognitoUser(
-  user: MappedCognitoUser,
-): Promise<void> {
-  const handle = user.username.trim().toLowerCase();
-  if (!/^[a-z0-9._-]{3,32}$/.test(handle) || isCognitoUuid(handle)) return;
-
-  const client = await dataClientPromise;
-  const byUsername = await client.models.UserProfile.list({
-    filter: { username: { eq: handle } },
-    authMode: 'iam',
-  });
-
-  const related = new Map<string, UserProfileRow>();
-  for (const profile of byUsername.data) {
-    related.set(profile.id, profile);
-  }
-
-  if (user.cognitoSub) {
-    const bySub = await client.models.UserProfile.list({
-      filter: { cognitoSub: { eq: user.cognitoSub } },
-      authMode: 'iam',
-    });
-    for (const profile of bySub.data) {
-      related.set(profile.id, profile);
-    }
-
-    const byLegacyUsername = await client.models.UserProfile.list({
-      filter: { username: { eq: user.cognitoSub } },
-      authMode: 'iam',
-    });
-    for (const profile of byLegacyUsername.data) {
-      related.set(profile.id, profile);
-    }
-  }
-
-  const profiles = [...related.values()];
-
-  if (profiles.length === 0) {
-    await client.models.UserProfile.create(
-      {
-        username: handle,
-        cognitoSub: user.cognitoSub,
-        displayName: handle,
-        role: 'user',
-        phoneNumber: user.phoneNumber?.trim() || null,
-        avatarColor: '#64b5f6',
-      },
-      { authMode: 'iam' },
-    );
-    return;
-  }
-
-  const keeper =
-    profiles.find((p) => p.username === handle && p.cognitoSub === user.cognitoSub) ??
-    profiles.find((p) => p.username === handle && p.cognitoSub) ??
-    profiles.find((p) => p.username === handle) ??
-    profiles.find((p) => p.cognitoSub === user.cognitoSub) ??
-    profiles[0];
-
-  for (const profile of profiles) {
-    if (profile.id !== keeper.id) {
-      await client.models.UserProfile.delete(
-        { id: profile.id },
-        { authMode: 'iam' },
-      );
-    }
-  }
-
-  const rawTitle = keeper.displayName?.trim();
-  const displayName =
-    rawTitle && !isCognitoUuid(rawTitle) ? rawTitle : handle;
-
-  await client.models.UserProfile.update(
-    {
-      id: keeper.id,
-      username: handle,
-      cognitoSub: user.cognitoSub ?? keeper.cognitoSub,
-      displayName,
-      phoneNumber: user.phoneNumber?.trim() || keeper.phoneNumber,
-    },
-    { authMode: 'iam' },
-  );
-}
 
 function isMessageSender(
   senderUsername: string,
@@ -194,16 +113,16 @@ type DirectoryEntry = {
 };
 
 async function listUserDirectory(): Promise<DirectoryEntry[]> {
+  const client = await dataClientPromise;
   const cognitoUsers = await listUsers();
   for (const user of cognitoUsers) {
     try {
-      await syncProfileForCognitoUser(user);
+      await ensureProfileForCognitoUser(client, user);
     } catch (err) {
       console.error('profile reconcile failed for', user.username, err);
     }
   }
 
-  const client = await dataClientPromise;
   const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
   const byUsername = new Map<
     string,
@@ -218,8 +137,7 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
   const bySub = new Map<string, (typeof byUsername extends Map<string, infer V> ? V : never)>();
 
   for (const profile of profiles.data) {
-    if (!/^[a-z0-9._-]{3,32}$/.test(profile.username)) continue;
-    if (isCognitoUuid(profile.username)) continue;
+    if (!isValidMessengerHandle(profile.username)) continue;
     if (profile.cognitoSub && profile.username === profile.cognitoSub) continue;
     if (!profile.cognitoSub) {
       const signedInSibling = profiles.data.find(
@@ -281,29 +199,6 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
   }
 
   return [...onePerUsername.values()];
-}
-
-async function ensureProfileStub(
-  handle: string,
-  phoneNumber?: string | null,
-): Promise<void> {
-  const client = await dataClientPromise;
-  const existing = await client.models.UserProfile.list({
-    filter: { username: { eq: handle } },
-    authMode: 'iam',
-  });
-  if (existing.data.length > 0) return;
-
-  await client.models.UserProfile.create(
-    {
-      username: handle,
-      displayName: handle,
-      role: 'user',
-      phoneNumber: phoneNumber?.trim() || null,
-      avatarColor: '#64b5f6',
-    },
-    { authMode: 'iam' },
-  );
 }
 
 async function listUsers() {
@@ -404,6 +299,8 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         );
       }
 
+      const client = await dataClientPromise;
+
       await cognito.send(
         new AdminCreateUserCommand({
           UserPoolId: poolId(),
@@ -425,13 +322,12 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         );
       }
 
-      await ensureProfileStub(handle, phoneNumber);
-
-      const createdUsers = await listUsers();
-      const created = createdUsers.find((u) => u.username === handle);
-      if (created) {
-        await syncProfileForCognitoUser(created);
-      }
+      const cognitoUser = (await listUsers()).find((u) => u.username === handle);
+      await ensureProfileForCognitoUser(client, {
+        username: handle,
+        cognitoSub: cognitoUser?.cognitoSub ?? null,
+        phoneNumber,
+      });
 
       return {
         username: handle,
@@ -479,7 +375,8 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       const users = await listUsers();
       const target = users.find((u) => u.username === handle);
       if (target) {
-        await syncProfileForCognitoUser(target);
+        const client = await dataClientPromise;
+        await ensureProfileForCognitoUser(client, target);
       }
 
       return {

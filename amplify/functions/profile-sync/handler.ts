@@ -15,10 +15,12 @@ import {
   conversationIncludesUser,
   repairParticipantList,
 } from '../shared/participant-repair';
+import {
+  consolidateUserProfiles,
+  type DataClient,
+} from '../shared/profile-consolidation';
 
 type Handler = Schema['syncMyProfile']['functionHandler'];
-type DataClient = ReturnType<typeof generateClient<Schema>>;
-type UserProfile = Schema['UserProfile']['type'];
 
 const dataClientPromise = getAmplifyDataClientConfig(
   env as Parameters<typeof getAmplifyDataClientConfig>[0],
@@ -71,62 +73,6 @@ async function repairMembershipRecords(
   }
 }
 
-async function listProfilesForUser(
-  client: DataClient,
-  username: string,
-  sub: string,
-): Promise<UserProfile[]> {
-  const byUsername = await client.models.UserProfile.list({
-    filter: { username: { eq: username } },
-    authMode: 'iam',
-  });
-  const bySub = await client.models.UserProfile.list({
-    filter: { cognitoSub: { eq: sub } },
-    authMode: 'iam',
-  });
-  const byLegacyUsername = await client.models.UserProfile.list({
-    filter: { username: { eq: sub } },
-    authMode: 'iam',
-  });
-
-  const merged = new Map<string, UserProfile>();
-  for (const profile of [
-    ...byUsername.data,
-    ...bySub.data,
-    ...byLegacyUsername.data,
-  ]) {
-    merged.set(profile.id, profile);
-  }
-  return [...merged.values()];
-}
-
-async function consolidateProfiles(
-  client: DataClient,
-  username: string,
-  sub: string,
-): Promise<UserProfile | null> {
-  const profiles = await listProfilesForUser(client, username, sub);
-  if (profiles.length === 0) return null;
-
-  const keeper =
-    profiles.find((p) => p.username === username && p.cognitoSub === sub) ??
-    profiles.find((p) => p.username === username && p.cognitoSub) ??
-    profiles.find((p) => p.username === username) ??
-    profiles.find((p) => p.cognitoSub === sub) ??
-    profiles[0];
-
-  for (const profile of profiles) {
-    if (profile.id !== keeper.id) {
-      await client.models.UserProfile.delete(
-        { id: profile.id },
-        { authMode: 'iam' },
-      );
-    }
-  }
-
-  return keeper;
-}
-
 export const handler: Handler = async (event) => {
   let { username, sub } = parseIdentity(event.identity);
   if (!sub) {
@@ -144,7 +90,7 @@ export const handler: Handler = async (event) => {
   const isAdmin = isAdminGroupMember(event.identity);
   const client = await dataClientPromise;
 
-  const existing = await consolidateProfiles(client, username, sub);
+  const existing = await consolidateUserProfiles(client, username, sub);
 
   let phone = existing?.phoneNumber ?? null;
   if (phoneArg !== undefined && phoneArg !== null) {
@@ -180,6 +126,7 @@ export const handler: Handler = async (event) => {
       },
       { authMode: 'iam' },
     );
+    await consolidateUserProfiles(client, username, sub);
     await repairMembershipRecords(client, username, sub);
     return {
       profileId: created.data?.id ?? '',

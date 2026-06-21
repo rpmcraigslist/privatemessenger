@@ -20,26 +20,16 @@ export function shouldInterceptSystemBack(): boolean {
   return window.matchMedia('(max-width: 768px)').matches;
 }
 
-function seedHistoryGuard(): void {
+function retrapHistory(): void {
   history.pushState(BACK_GUARD_STATE, '');
-}
-
-/** Call when opening a chat, modal, search panel, reply bar, etc. */
-export function pushAppNavigationLayer(): void {
-  if (!shouldInterceptSystemBack()) return;
-  history.pushState(BACK_GUARD_STATE, '');
-}
-
-/** Same as tapping the in-app back control — walks history when intercepted. */
-export function appNavigateBack(): boolean {
-  if (!shouldInterceptSystemBack()) return false;
-  history.back();
-  return true;
 }
 
 /**
  * Wire the OS back button/gesture to in-app navigation (close overlays, leave
  * chat) instead of exiting the app or browser tab.
+ *
+ * Uses a single history trap — never stacks pushState per screen. Stacking
+ * caused accidental "logout" when scroll/back gestures consumed multiple entries.
  */
 export function useSystemBackNavigation(onPop: () => void): void {
   const onPopRef = useRef(onPop);
@@ -48,16 +38,28 @@ export function useSystemBackNavigation(onPop: () => void): void {
   useEffect(() => {
     if (!shouldInterceptSystemBack()) return;
 
-    seedHistoryGuard();
+    retrapHistory();
 
     const onPopState = () => {
       onPopRef.current();
-      seedHistoryGuard();
+      retrapHistory();
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+}
+
+/** Same as tapping the in-app back control. */
+export function appNavigateBack(): boolean {
+  if (!shouldInterceptSystemBack()) return false;
+  history.back();
+  return true;
+}
+
+/** @deprecated No longer stacks history — kept so callers compile unchanged. */
+export function pushAppNavigationLayer(): void {
+  // Intentionally empty. Layer tracking caused history stack blow-up.
 }
 
 /** @deprecated use useSystemBackNavigation */

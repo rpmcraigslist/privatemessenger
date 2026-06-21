@@ -37,9 +37,10 @@ type AuditResult = {
 
 type Props = {
   onClose: () => void;
+  onDataRepaired?: () => void;
 };
 
-export default function AdminPanel({ onClose }: Props) {
+export default function AdminPanel({ onClose, onDataRepaired }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [audit, setAudit] = useState<AuditResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -245,9 +246,9 @@ export default function AdminPanel({ onClose }: Props) {
       });
       if (errors?.length) throw new Error(errors[0].message);
       setMessage(
-        `Removed ${data?.deletedMessages ?? 0} message(s) and ${data?.deletedConversations ?? 0} direct chat(s) between ${usernameA} and ${usernameB}.`,
+        `Removed ${data?.deletedMessages ?? 0} message(s) and ${data?.deletedConversations ?? 0} direct chat(s) between ${usernameA} and ${usernameB}. Refreshing…`,
       );
-      await loadAudit();
+      onDataRepaired?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Direct chat purge failed');
     } finally {
@@ -277,9 +278,10 @@ export default function AdminPanel({ onClose }: Props) {
           `Duplicate chats removed: ${data?.duplicateConversationsRemoved ?? 0}.`,
           `Messages removed with duplicate chats: ${data?.messagesRemoved ?? 0}.`,
           `Conversations normalized: ${data?.conversationsNormalized ?? 0}.`,
+          'Refreshing…',
         ].join(' '),
       );
-      await loadAudit();
+      onDataRepaired?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reconcile failed');
     } finally {
@@ -315,6 +317,52 @@ export default function AdminPanel({ onClose }: Props) {
           {error && (
             <p className="mb-3 text-sm text-red-400">{error}</p>
           )}
+
+          <section className="mb-6 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-panel-2)] px-3 py-3">
+            <h3 className="mb-1 font-medium text-[var(--color-accent)]">
+              Fix duplicate chats
+            </h3>
+            <p className="mb-3 text-sm text-[var(--color-muted)]">
+              If you see two conversations with the same person, run reconcile to
+              merge duplicate threads in the database, then refresh everyone&apos;s
+              app. Use purge direct chat to wipe messages between two users only.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => void reconcileMessenger()}
+                disabled={busy}
+                className="w-full rounded-lg px-3 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+                style={{ background: 'var(--color-accent)' }}
+              >
+                Reconcile profiles and chats
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={purgeUserA}
+                  onChange={(e) => setPurgeUserA(e.target.value)}
+                  placeholder="Username A"
+                  autoComplete="off"
+                  className="rounded-lg bg-[var(--color-app-bg)] px-3 py-2 text-sm outline-none"
+                />
+                <input
+                  value={purgeUserB}
+                  onChange={(e) => setPurgeUserB(e.target.value)}
+                  placeholder="Username B"
+                  autoComplete="off"
+                  className="rounded-lg bg-[var(--color-app-bg)] px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void purgeDirectChat()}
+                disabled={busy}
+                className="w-full rounded-lg border border-amber-400/40 px-3 py-2 text-sm text-amber-300 hover:bg-amber-400/10 disabled:opacity-40"
+              >
+                Purge direct chat between two users
+              </button>
+            </div>
+          </section>
 
           <section className="mb-6">
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -364,48 +412,6 @@ export default function AdminPanel({ onClose }: Props) {
                 )}
               </div>
             ) : null}
-          </section>
-
-          <section className="mb-6">
-            <h3 className="mb-2 font-medium">Cleanup</h3>
-            <div className="space-y-2 rounded-lg border border-white/10 px-3 py-3">
-              <p className="text-sm text-[var(--color-muted)]">
-                Remove all direct messages between two users and delete their 1:1
-                conversation threads.
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  value={purgeUserA}
-                  onChange={(e) => setPurgeUserA(e.target.value)}
-                  placeholder="Username A"
-                  autoComplete="off"
-                  className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
-                />
-                <input
-                  value={purgeUserB}
-                  onChange={(e) => setPurgeUserB(e.target.value)}
-                  placeholder="Username B"
-                  autoComplete="off"
-                  className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => void purgeDirectChat()}
-                disabled={busy}
-                className="w-full rounded-lg border border-amber-400/40 px-3 py-2 text-sm text-amber-300 hover:bg-amber-400/10 disabled:opacity-40"
-              >
-                Purge direct chat
-              </button>
-              <button
-                type="button"
-                onClick={() => void reconcileMessenger()}
-                disabled={busy}
-                className="w-full rounded-lg border border-[var(--color-accent)]/40 px-3 py-2 text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-40"
-              >
-                Reconcile profiles and chats
-              </button>
-            </div>
           </section>
 
           <section className="mb-6">

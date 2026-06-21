@@ -37,7 +37,6 @@ import ChatGroupPanel from './ChatGroupPanel';
 import MessageComposer from './MessageComposer';
 
 import Attachment from './Attachment';
-import { pushAppNavigationLayer } from '../lib/back-navigation';
 
 export type ChatBackHandle = {
   handleBack: () => boolean;
@@ -171,26 +170,6 @@ export default function ChatView({
       chatBackRef.current = null;
     };
   }, [chatBackRef, messageMenu, replyTo, searchOpen, showDetails]);
-
-  const overlayNavRef = useRef({
-    showDetails: false,
-    searchOpen: false,
-    hasReply: false,
-  });
-
-  useEffect(() => {
-    const prev = overlayNavRef.current;
-    const opened =
-      (showDetails && !prev.showDetails) ||
-      (searchOpen && !prev.searchOpen) ||
-      (Boolean(replyTo) && !prev.hasReply);
-    if (opened) pushAppNavigationLayer();
-    overlayNavRef.current = {
-      showDetails,
-      searchOpen,
-      hasReply: Boolean(replyTo),
-    };
-  }, [showDetails, searchOpen, replyTo]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -977,6 +956,8 @@ export default function ChatView({
 
           overflowAnchor: 'none',
 
+          overscrollBehavior: 'contain',
+
         }}
 
       >
@@ -1451,7 +1432,7 @@ function Bubble({
 
   return (
 
-    <div className={`flex ${mine ? 'justify-end' : 'justify-start'} ${deleting ? 'opacity-50' : ''}`}>
+    <div className={`flex ${mine ? 'justify-start' : 'justify-end'} ${deleting ? 'opacity-50' : ''}`}>
 
       <div
 

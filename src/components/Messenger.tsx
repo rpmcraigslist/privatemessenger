@@ -44,6 +44,8 @@ import {
 
   conversationTitle,
 
+  dedupeDirectConversations,
+
   isSameMessengerUser,
 
   messageListPreview,
@@ -65,8 +67,6 @@ import NotificationPrompt from './NotificationPrompt';
 import {
 
   appNavigateBack,
-
-  pushAppNavigationLayer,
 
   useSystemBackNavigation,
 
@@ -263,26 +263,6 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-  useEffect(() => {
-
-    if (selectedId) pushAppNavigationLayer();
-
-  }, [selectedId]);
-
-
-
-  useEffect(() => {
-
-    if (showNewChat || showProfile || showAdmin) {
-
-      pushAppNavigationLayer();
-
-    }
-
-  }, [showNewChat, showProfile, showAdmin]);
-
-
-
   const reloadDirectory = useCallback(async () => {
 
     try {
@@ -433,9 +413,37 @@ export default function Messenger({ onSignOut }: Props) {
 
     }
 
-    return [...byId.values()];
+    const merged = [...byId.values()];
 
-  }, [conversations, optimisticConversations]);
+    if (!user) return merged;
+
+    return dedupeDirectConversations(
+
+      merged,
+
+      (conversation) => conversationActivityAt(conversation, latestByConversation),
+
+      user.username,
+
+      user.cognitoSub,
+
+      handleToSub,
+
+    );
+
+  }, [
+
+    conversations,
+
+    handleToSub,
+
+    latestByConversation,
+
+    optimisticConversations,
+
+    user,
+
+  ]);
 
 
 
@@ -1139,7 +1147,7 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-      {showAdmin && user.isAdmin && (
+        {showAdmin && user.isAdmin && (
 
         <AdminPanel
 
@@ -1148,6 +1156,12 @@ export default function Messenger({ onSignOut }: Props) {
             setShowAdmin(false);
 
             void reloadDirectory();
+
+          }}
+
+          onDataRepaired={() => {
+
+            window.location.reload();
 
           }}
 

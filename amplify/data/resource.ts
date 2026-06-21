@@ -82,6 +82,8 @@ const schema = a
 
     AdminDeleteUserResult: a.customType({
       username: a.string().required(),
+      deletedMessages: a.integer().required(),
+      deletedConversations: a.integer().required(),
     }),
 
     AdminForcePasswordChangeResult: a.customType({

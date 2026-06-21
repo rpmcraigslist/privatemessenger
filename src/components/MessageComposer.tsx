@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { uploadData } from 'aws-amplify/storage';
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 import {
@@ -40,20 +40,6 @@ export default function MessageComposer({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (replyTo) {
-      textareaRef.current?.focus();
-    }
-  }, [replyTo]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [conversation.id]);
 
   const canSend = (text.trim().length > 0 || file != null) && !sending;
 
@@ -156,7 +142,6 @@ export default function MessageComposer({
       if (fileInputRef.current) fileInputRef.current.value = '';
       onCancelReply?.();
       onSent?.();
-      window.setTimeout(() => textareaRef.current?.focus(), 0);
     } catch (err) {
       console.error('failed to send message', err);
       setError('Failed to send. Please try again.');
@@ -243,7 +228,6 @@ export default function MessageComposer({
         />
 
         <textarea
-          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}

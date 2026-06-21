@@ -48,6 +48,12 @@ export type PurgeDirectChatResult = {
   deletedConversations: number;
 };
 
+export type PurgeUserMessengerResult = {
+  deletedMessages: number;
+  deletedConversations: number;
+  updatedGroupConversations: number;
+};
+
 export type ReconcileMessengerResult = {
   profilesConsolidated: number;
   orphanProfilesRemoved: number;
@@ -105,6 +111,48 @@ export function isDirectConversationBetween(
     if (matchesB) hasB = true;
   }
   return hasA && hasB;
+}
+
+export function conversationIncludesIdentity(
+  conversation: Pick<Conversation, 'participants'>,
+  identity: UserParticipantIdentity,
+): boolean {
+  const participants = (conversation.participants ?? []).filter(
+    (participant): participant is string => !!participant,
+  );
+  return participants.some((participant) =>
+    participantMatchesIdentity(participant, identity),
+  );
+}
+
+function stripIdentityFromParticipants(
+  participants: string[],
+  identity: UserParticipantIdentity,
+): string[] {
+  return participants.filter(
+    (participant) => !participantMatchesIdentity(participant, identity),
+  );
+}
+
+function isMessageSentByIdentity(
+  message: Schema['Message']['type'],
+  identity: UserParticipantIdentity,
+): boolean {
+  if (!message.senderUsername) return false;
+  return participantMatchesIdentity(message.senderUsername, identity);
+}
+
+function isMessageAssociatedWithIdentity(
+  message: Schema['Message']['type'],
+  identity: UserParticipantIdentity,
+): boolean {
+  if (isMessageSentByIdentity(message, identity)) return true;
+  const participants = (message.participantUsernames ?? []).filter(
+    (participant): participant is string => !!participant,
+  );
+  return participants.some((participant) =>
+    participantMatchesIdentity(participant, identity),
+  );
 }
 
 async function listAllProfiles(client: DataClient) {
@@ -345,6 +393,111 @@ export async function purgeDirectChatBetween(
     usernameB: handleB,
     deletedMessages,
     deletedConversations,
+  };
+}
+
+/** Remove a user's chats and messages before deleting their account. */
+export async function purgeUserMessengerData(
+  client: DataClient,
+  identity: UserParticipantIdentity,
+): Promise<PurgeUserMessengerResult> {
+  const conversations = await listAllConversations(client);
+  const messages = await listAllMessages(client);
+  const messagesByConversation = new Map<string, Schema['Message']['type'][]>();
+  for (const message of messages) {
+    if (!message.conversationId) continue;
+    const bucket = messagesByConversation.get(message.conversationId) ?? [];
+    bucket.push(message);
+    messagesByConversation.set(message.conversationId, bucket);
+  }
+
+  let deletedMessages = 0;
+  let deletedConversations = 0;
+  let updatedGroupConversations = 0;
+
+  for (const conversation of conversations) {
+    if (!conversationIncludesIdentity(conversation, identity)) continue;
+
+    if (!conversation.isGroup) {
+      deletedMessages += await deleteConversationWithMessages(
+        client,
+        conversation.id,
+        messagesByConversation,
+      );
+      deletedConversations++;
+      continue;
+    }
+
+    const convMessages = messagesByConversation.get(conversation.id) ?? [];
+    const remainingMessages: Schema['Message']['type'][] = [];
+
+    for (const message of convMessages) {
+      if (isMessageSentByIdentity(message, identity)) {
+        await client.models.Message.delete({ id: message.id }, { authMode: 'iam' });
+        deletedMessages++;
+        continue;
+      }
+      remainingMessages.push(message);
+    }
+    messagesByConversation.set(conversation.id, remainingMessages);
+
+    const remainingParticipants = stripIdentityFromParticipants(
+      (conversation.participants ?? []).filter(
+        (participant): participant is string => !!participant,
+      ),
+      identity,
+    );
+
+    if (remainingParticipants.length === 0) {
+      deletedMessages += await deleteConversationWithMessages(
+        client,
+        conversation.id,
+        messagesByConversation,
+      );
+      deletedConversations++;
+      continue;
+    }
+
+    await client.models.Conversation.update(
+      { id: conversation.id, participants: remainingParticipants },
+      { authMode: 'iam' },
+    );
+    updatedGroupConversations++;
+
+    for (const message of remainingMessages) {
+      const participantUsernames = (message.participantUsernames ?? []).filter(
+        (participant): participant is string => !!participant,
+      );
+      const normalizedParticipants = stripIdentityFromParticipants(
+        participantUsernames,
+        identity,
+      );
+      if (normalizedParticipants.length === participantUsernames.length) continue;
+
+      await client.models.Message.update(
+        {
+          id: message.id,
+          participantUsernames: normalizedParticipants,
+        },
+        { authMode: 'iam' },
+      );
+    }
+  }
+
+  const orphanMessages = [
+    ...messagesByConversation.values().flat(),
+    ...messages.filter((message) => !message.conversationId),
+  ];
+  for (const message of orphanMessages) {
+    if (!isMessageAssociatedWithIdentity(message, identity)) continue;
+    await client.models.Message.delete({ id: message.id }, { authMode: 'iam' });
+    deletedMessages++;
+  }
+
+  return {
+    deletedMessages,
+    deletedConversations,
+    updatedGroupConversations,
   };
 }
 

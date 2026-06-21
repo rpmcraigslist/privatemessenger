@@ -162,15 +162,26 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
   }
 
   async function removeUser(username: string) {
-    if (!confirm(`Remove user "${username}"?`)) return;
+    if (
+      !confirm(
+        `Remove user "${username}" and delete their conversations and messages?`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const { errors } = await client.mutations.adminDeleteUser({ username });
+      const { data, errors } = await client.mutations.adminDeleteUser({ username });
       if (errors?.length) throw new Error(errors[0].message);
-      setMessage(`Removed ${username}`);
+      const deletedMessages = data?.deletedMessages ?? 0;
+      const deletedConversations = data?.deletedConversations ?? 0;
+      setMessage(
+        `Removed ${username}. Deleted ${deletedMessages} message(s) and ${deletedConversations} conversation(s).`,
+      );
       await loadUsers();
       await loadAudit();
+      onDataRepaired?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
     } finally {

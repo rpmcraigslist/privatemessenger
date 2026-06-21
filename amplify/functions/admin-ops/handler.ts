@@ -18,7 +18,9 @@ import {
 } from '../shared/profile-consolidation';
 import {
   auditMessengerData,
+  buildParticipantIdentityForHandle,
   purgeDirectChatBetween,
+  purgeUserMessengerData,
   reconcileMessengerData,
 } from '../shared/messenger-reconcile';
 import {
@@ -428,13 +430,26 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       if (handle === actor) {
         throw new Error('You cannot delete your own account while signed in.');
       }
+      const client = await dataClientPromise;
+      const users = await listUsers();
+      const cognitoUsers = users.map((user) => ({
+        loginId: user.loginId,
+        username: user.username,
+        cognitoSub: user.cognitoSub,
+      }));
+      const identity = await buildParticipantIdentityForHandle(
+        client,
+        cognitoUsers,
+        handle,
+      );
+      const { deletedMessages, deletedConversations } =
+        await purgeUserMessengerData(client, identity);
       await cognito.send(
         new AdminDeleteUserCommand({
           UserPoolId: poolId(),
           Username: toLoginId(handle),
         }),
       );
-      const client = await dataClientPromise;
       const profiles = await client.models.UserProfile.list({
         filter: { username: { eq: handle } },
         authMode: 'iam',
@@ -442,7 +457,7 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       for (const p of profiles.data) {
         await client.models.UserProfile.delete({ id: p.id }, { authMode: 'iam' });
       }
-      return { username: handle };
+      return { username: handle, deletedMessages, deletedConversations };
     }
     case 'adminForcePasswordChange': {
       const { username, temporaryPassword } = event.arguments;
@@ -472,10 +487,22 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       };
     }
     case 'adminPurgeUsers': {
+      const client = await dataClientPromise;
       const users = await listUsers();
+      const cognitoUsers = users.map((user) => ({
+        loginId: user.loginId,
+        username: user.username,
+        cognitoSub: user.cognitoSub,
+      }));
       let deleted = 0;
       for (const u of users) {
         if (u.username === actor) continue;
+        const identity = await buildParticipantIdentityForHandle(
+          client,
+          cognitoUsers,
+          u.username,
+        );
+        await purgeUserMessengerData(client, identity);
         await cognito.send(
           new AdminDeleteUserCommand({
             UserPoolId: poolId(),
@@ -484,7 +511,6 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         );
         deleted++;
       }
-      const client = await dataClientPromise;
       const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
       for (const p of profiles.data) {
         if (p.username === actor) continue;

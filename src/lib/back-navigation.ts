@@ -2,6 +2,10 @@ import { useEffect, useRef } from 'react';
 
 const BACK_GUARD_STATE = { messengerBackGuard: true as const };
 
+export type BackNavigationResult =
+  | boolean
+  | { handled: boolean; keepLayer?: boolean };
+
 /** Installed PWA / home-screen web app (not a normal browser tab). */
 export function isStandalonePwa(): boolean {
   if (typeof window === 'undefined') return false;
@@ -20,29 +24,86 @@ export function shouldInterceptSystemBack(): boolean {
   return window.matchMedia('(max-width: 768px)').matches;
 }
 
-function retrapHistory(): void {
-  history.pushState(BACK_GUARD_STATE, '');
+let backHandler: (() => BackNavigationResult) | null = null;
+let layerPushed = false;
+let suppressNextPop = false;
+
+function parseBackResult(result: BackNavigationResult): {
+  handled: boolean;
+  keepLayer: boolean;
+} {
+  if (typeof result === 'boolean') {
+    return { handled: result, keepLayer: false };
+  }
+  return {
+    handled: result.handled,
+    keepLayer: result.keepLayer ?? false,
+  };
+}
+
+/** Push or pop a single history entry to mirror in-app overlay depth (chat/modals). */
+export function syncBackHistoryLayer(needsLayer: boolean): void {
+  if (!shouldInterceptSystemBack()) return;
+
+  if (needsLayer) {
+    if (!layerPushed) {
+      history.pushState(BACK_GUARD_STATE, '');
+      layerPushed = true;
+    }
+    return;
+  }
+
+  if (layerPushed) {
+    suppressNextPop = true;
+    history.back();
+    layerPushed = false;
+  }
 }
 
 /**
- * Wire the OS back button/gesture to in-app navigation (close overlays, leave
- * chat) instead of exiting the app or browser tab.
- *
- * Uses a single history trap — never stacks pushState per screen. Stacking
- * caused accidental "logout" when scroll/back gestures consumed multiple entries.
+ * Wire the OS back button to in-app navigation. History is not trapped on load —
+ * only when syncBackHistoryLayer(true) runs (chat open, modal open).
  */
-export function useSystemBackNavigation(onPop: () => void): void {
+export function useSystemBackNavigation(
+  onPop: () => BackNavigationResult,
+  needsLayer: boolean,
+): void {
   const onPopRef = useRef(onPop);
   onPopRef.current = onPop;
 
   useEffect(() => {
+    const handler = () => onPopRef.current();
+    backHandler = handler;
+    return () => {
+      if (backHandler === handler) {
+        backHandler = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    syncBackHistoryLayer(needsLayer);
+  }, [needsLayer]);
+
+  useEffect(() => {
     if (!shouldInterceptSystemBack()) return;
 
-    retrapHistory();
-
     const onPopState = () => {
-      onPopRef.current();
-      retrapHistory();
+      if (suppressNextPop) {
+        suppressNextPop = false;
+        return;
+      }
+
+      if (!layerPushed) return;
+
+      layerPushed = false;
+      const { handled, keepLayer } = parseBackResult(onPopRef.current());
+      if (!handled) return;
+
+      if (keepLayer) {
+        history.pushState(BACK_GUARD_STATE, '');
+        layerPushed = true;
+      }
     };
 
     window.addEventListener('popstate', onPopState);
@@ -50,16 +111,15 @@ export function useSystemBackNavigation(onPop: () => void): void {
   }, []);
 }
 
-/** Same as tapping the in-app back control. */
+/** Run in-app back (close overlay / leave chat). Does not touch browser history. */
 export function appNavigateBack(): boolean {
   if (!shouldInterceptSystemBack()) return false;
-  history.back();
-  return true;
+  return parseBackResult(backHandler?.() ?? false).handled;
 }
 
 /** @deprecated No longer stacks history — kept so callers compile unchanged. */
 export function pushAppNavigationLayer(): void {
-  // Intentionally empty. Layer tracking caused history stack blow-up.
+  // Intentionally empty.
 }
 
 /** @deprecated use useSystemBackNavigation */

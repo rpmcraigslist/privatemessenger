@@ -422,17 +422,223 @@ export function participantDisplayName(
   return 'User';
 }
 
+function collectSelfIdentityAliases(
+  myUsername: string,
+  mySub: string,
+  subToUsername: Map<string, string>,
+  participantIds: Iterable<string> = [],
+): Set<string> {
+  const myHandle = normalizeUsername(myUsername);
+  const aliases = new Set<string>();
+
+  const add = (value: string | null | undefined) => {
+    if (!value?.trim()) return;
+    aliases.add(value.trim().toLowerCase());
+    const handle = normalizeProfileHandle(value);
+    if (handle) aliases.add(handle);
+    const fromLogin = normalizeUsername(fromLoginId(value));
+    if (isValidUsername(fromLogin)) aliases.add(fromLogin);
+  };
+
+  add(mySub);
+  add(myHandle);
+  add(toLoginId(myHandle));
+
+  for (const [key, handle] of subToUsername) {
+    if (normalizeUsername(handle) === myHandle) add(key);
+  }
+
+  for (const participantId of participantIds) {
+    add(participantId);
+  }
+
+  return aliases;
+}
+
 export function isSameMessengerUser(
   left: string,
   myUsername: string,
   mySub: string,
   subToUsername: Map<string, string>,
+  participantIds?: Iterable<string>,
 ): boolean {
-  if (left === myUsername || left === mySub) return true;
-  if (left === toLoginId(myUsername)) return true;
-  const leftHandle =
-    subToUsername.get(left) ?? normalizeProfileHandle(left);
-  return leftHandle === myUsername;
+  if (!left?.trim()) return false;
+
+  const aliases = collectSelfIdentityAliases(
+    myUsername,
+    mySub,
+    subToUsername,
+    participantIds ?? [],
+  );
+  const leftNorm = left.trim().toLowerCase();
+  if (aliases.has(leftNorm)) return true;
+
+  const leftHandle = normalizeUsername(
+    resolveParticipantHandle(left, subToUsername),
+  );
+  return aliases.has(leftHandle) || leftHandle === normalizeUsername(myUsername);
+}
+
+/** Fast path for the signed-in user's common sender id forms. */
+export function matchesSelfSender(
+  senderUsername: string | null | undefined,
+  myUsername: string,
+  mySub: string,
+): boolean {
+  if (!senderUsername?.trim()) return false;
+  const sender = senderUsername.trim().toLowerCase();
+  const handle = normalizeUsername(myUsername);
+  const sub = mySub.trim().toLowerCase();
+  if (!handle && !sub) return false;
+  if (sub && sender === sub) return true;
+  if (handle && sender === handle) return true;
+  if (handle && sender === toLoginId(handle)) return true;
+  const senderHandle = normalizeUsername(fromLoginId(sender));
+  return !!handle && isValidUsername(senderHandle) && senderHandle === handle;
+}
+
+/** Whether a message was sent by the signed-in user (handles legacy sender ids). */
+export function isMessageFromSelf(
+  senderUsername: string,
+  myUsername: string,
+  mySub: string,
+  subToUsername: Map<string, string>,
+  handleToSub: Map<string, string>,
+  conversation: {
+    isGroup?: boolean | null;
+    participants: (string | null)[];
+  },
+): boolean {
+  const participants = conversation.participants.filter(
+    (participant): participant is string => !!participant,
+  );
+
+  if (matchesSelfSender(senderUsername, myUsername, mySub)) {
+    return true;
+  }
+
+  if (
+    isSameMessengerUser(
+      senderUsername,
+      myUsername,
+      mySub,
+      subToUsername,
+    )
+  ) {
+    return true;
+  }
+
+  const resolvedSender = resolveParticipantSub(
+    senderUsername,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  if (resolvedSender.toLowerCase() === mySub.toLowerCase()) {
+    return true;
+  }
+
+  for (const participant of participants) {
+    if (participant.trim().toLowerCase() !== senderUsername.trim().toLowerCase()) {
+      continue;
+    }
+    if (
+      isSameMessengerUser(
+        participant,
+        myUsername,
+        mySub,
+        subToUsername,
+      )
+    ) {
+      return true;
+    }
+    const resolvedParticipant = resolveParticipantSub(
+      participant,
+      myUsername,
+      mySub,
+      handleToSub,
+    );
+    if (resolvedParticipant.toLowerCase() === mySub.toLowerCase()) {
+      return true;
+    }
+  }
+
+  if (conversation.isGroup || participants.length !== 2) {
+    return false;
+  }
+
+  const senderNorm = senderUsername.trim().toLowerCase();
+  const matchingParticipant = participants.find(
+    (participant) => participant.trim().toLowerCase() === senderNorm,
+  );
+  const otherParticipant = participants.find(
+    (participant) => participant.trim().toLowerCase() !== senderNorm,
+  );
+
+  if (matchingParticipant && otherParticipant) {
+    const matchingHandle = normalizeUsername(
+      resolveParticipantHandle(matchingParticipant, subToUsername),
+    );
+    const otherHandle = normalizeUsername(
+      resolveParticipantHandle(otherParticipant, subToUsername),
+    );
+    const myHandle = normalizeUsername(myUsername);
+
+    const participantIsSelf = (participant: string) =>
+      isSameMessengerUser(participant, myUsername, mySub, subToUsername) ||
+      resolveParticipantSub(participant, myUsername, mySub, handleToSub)
+        .toLowerCase() === mySub.toLowerCase();
+
+    const matchingIsSelf = participantIsSelf(matchingParticipant);
+    const otherIsSelf = participantIsSelf(otherParticipant);
+
+    if (matchingIsSelf) return true;
+    if (otherIsSelf && matchingHandle !== myHandle) return false;
+    if (!otherIsSelf && otherHandle !== myHandle) return true;
+  }
+
+  const peerParticipant = participants.find(
+    (participant) =>
+      !isSameMessengerUser(
+        participant,
+        myUsername,
+        mySub,
+        subToUsername,
+      ) &&
+      resolveParticipantSub(
+        participant,
+        myUsername,
+        mySub,
+        handleToSub,
+      ).toLowerCase() !== mySub.toLowerCase(),
+  );
+  if (!peerParticipant) return false;
+
+  if (senderNorm === peerParticipant.trim().toLowerCase()) {
+    return false;
+  }
+
+  const peerHandle = normalizeUsername(
+    resolveParticipantHandle(peerParticipant, subToUsername),
+  );
+  const senderHandle = normalizeUsername(
+    resolveParticipantHandle(senderUsername, subToUsername),
+  );
+  if (senderHandle === peerHandle) return false;
+
+  const peerSub = handleToSub.get(peerHandle) ?? '';
+  if (
+    isSameMessengerUser(
+      senderUsername,
+      peerHandle,
+      peerSub,
+      subToUsername,
+    )
+  ) {
+    return false;
+  }
+
+  return isCognitoUuid(senderUsername.trim());
 }
 
 export function formatTime(iso?: string | null): string {

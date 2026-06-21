@@ -4,6 +4,7 @@ import { client, type ConversationModel, type MessageModel } from '../lib/amplif
 import {
   formatBytes,
   messageListPreview,
+  normalizeUsername,
   participantDisplayName,
   repairParticipantSubs,
   type ReplyTarget,
@@ -98,7 +99,7 @@ export default function MessageComposer({
       const { data: created, errors: createErrors } = await client.models.Message.create({
         conversationId: conversation.id,
         content: body || undefined,
-        senderUsername: myUsername,
+        senderUsername: normalizeUsername(myUsername),
         participantUsernames,
         type,
         attachmentKey,

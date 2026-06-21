@@ -14,7 +14,7 @@ import {
 
   formatTime,
 
-  isSameMessengerUser,
+  isMessageFromSelf,
 
   messageMatchesSearch,
 
@@ -942,7 +942,7 @@ export default function ChatView({
 
         ref={scrollRef}
 
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4 md:px-12"
+        className="chat-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4 md:px-12"
 
         style={{
 
@@ -956,7 +956,9 @@ export default function ChatView({
 
           overflowAnchor: 'none',
 
-          overscrollBehavior: 'contain',
+          overscrollBehavior: 'none',
+
+          touchAction: 'pan-y pinch-zoom',
 
         }}
 
@@ -984,7 +986,7 @@ export default function ChatView({
 
             {messages.map((m, i) => {
 
-              const mine = isSameMessengerUser(
+              const mine = isMessageFromSelf(
 
                 m.senderUsername,
 
@@ -993,6 +995,10 @@ export default function ChatView({
                 mySub,
 
                 subToUsername,
+
+                handleToSub,
+
+                conversation,
 
               );
 
@@ -1432,7 +1438,7 @@ function Bubble({
 
   return (
 
-    <div className={`flex ${mine ? 'justify-start' : 'justify-end'} ${deleting ? 'opacity-50' : ''}`}>
+    <div className={`message-row ${mine ? 'message-row-self' : 'message-row-peer'} ${deleting ? 'opacity-50' : ''}`}>
 
       <div
 

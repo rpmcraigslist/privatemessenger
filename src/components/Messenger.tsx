@@ -66,8 +66,6 @@ import NotificationPrompt from './NotificationPrompt';
 
 import {
 
-  appNavigateBack,
-
   useSystemBackNavigation,
 
 } from '../lib/back-navigation';
@@ -221,7 +219,9 @@ export default function Messenger({ onSignOut }: Props) {
 
   useSystemBackNavigation(() => {
 
-    if (chatBackRef.current?.handleBack()) return true;
+    if (chatBackRef.current?.handleBack()) {
+      return { handled: true, keepLayer: true };
+    }
 
     const ui = uiStateRef.current;
 
@@ -229,7 +229,10 @@ export default function Messenger({ onSignOut }: Props) {
 
       setShowNewChat(false);
 
-      return true;
+      return {
+        handled: true,
+        keepLayer: !!(ui.selectedId || ui.showAdmin || ui.showProfile),
+      };
 
     }
 
@@ -237,7 +240,10 @@ export default function Messenger({ onSignOut }: Props) {
 
       setShowProfile(false);
 
-      return true;
+      return {
+        handled: true,
+        keepLayer: !!(ui.selectedId || ui.showNewChat || ui.showAdmin),
+      };
 
     }
 
@@ -245,7 +251,10 @@ export default function Messenger({ onSignOut }: Props) {
 
       setShowAdmin(false);
 
-      return true;
+      return {
+        handled: true,
+        keepLayer: !!(ui.selectedId || ui.showNewChat || ui.showProfile),
+      };
 
     }
 
@@ -253,13 +262,13 @@ export default function Messenger({ onSignOut }: Props) {
 
       setSelectedId(null);
 
-      return true;
+      return { handled: true, keepLayer: false };
 
     }
 
     return false;
 
-  });
+  }, !!(selectedId || showNewChat || showAdmin || showProfile));
 
 
 
@@ -1079,7 +1088,7 @@ export default function Messenger({ onSignOut }: Props) {
 
             onBack={() => {
 
-              if (appNavigateBack()) return;
+              if (chatBackRef.current?.handleBack()) return;
 
               setSelectedId(null);
 

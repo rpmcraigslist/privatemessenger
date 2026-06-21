@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   dedupeDirectConversations,
   dedupeUserProfiles,
+  isMessageFromSelf,
   isSameMessengerUser,
+  matchesSelfSender,
   repairParticipantSubs,
 } from './util';
 
@@ -108,5 +110,111 @@ describe('isSameMessengerUser', () => {
       isSameMessengerUser('alice@messenger.local', 'alice', 'sub-a', subMap),
     ).toBe(true);
     expect(isSameMessengerUser('bob', 'alice', 'sub-a', subMap)).toBe(false);
+  });
+
+  it('matches case-insensitive handles and login ids', () => {
+    expect(isSameMessengerUser('Alice', 'alice', 'sub-a', subMap)).toBe(true);
+    expect(
+      isSameMessengerUser('Alice@messenger.local', 'alice', 'sub-a', subMap),
+    ).toBe(true);
+  });
+
+  it('matches participant ids that refer to the signed-in user', () => {
+    expect(
+      isSameMessengerUser(
+        'legacy-sub-a',
+        'alice',
+        'sub-a',
+        subMap,
+        ['legacy-sub-a'],
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('matchesSelfSender', () => {
+  it('matches handle, sub, and login id for the signed-in user', () => {
+    expect(matchesSelfSender('paul', 'paul', 'sub-paul')).toBe(true);
+    expect(matchesSelfSender('sub-paul', 'paul', 'sub-paul')).toBe(true);
+    expect(matchesSelfSender('paul@messenger.local', 'paul', 'sub-paul')).toBe(
+      true,
+    );
+    expect(matchesSelfSender('lena', 'paul', 'sub-paul')).toBe(false);
+  });
+});
+
+describe('isMessageFromSelf', () => {
+  const subMap = new Map([
+    ['sub-paul', 'paul'],
+    ['paul@messenger.local', 'paul'],
+    ['sub-lena', 'lena'],
+    ['lena@messenger.local', 'lena'],
+  ]);
+  const handleToSub = new Map([
+    ['paul', 'sub-paul'],
+    ['lena', 'sub-lena'],
+  ]);
+
+  it('treats a brand-new bare-handle message as self', () => {
+    expect(
+      isMessageFromSelf(
+        'paul',
+        'paul',
+        'sub-paul',
+        new Map(),
+        new Map(),
+        {
+          isGroup: false,
+          participants: ['sub-paul', 'sub-lena'],
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('treats legacy self subs in 1:1 chats as own messages', () => {
+    const legacySelfSub = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    expect(
+      isMessageFromSelf(
+        legacySelfSub,
+        'paul',
+        'sub-paul',
+        subMap,
+        handleToSub,
+        {
+          isGroup: false,
+          participants: ['sub-paul', 'sub-lena'],
+        },
+      ),
+    ).toBe(true);
+
+    expect(
+      isMessageFromSelf(
+        'legacy-sub-paul',
+        'paul',
+        'sub-paul',
+        subMap,
+        handleToSub,
+        {
+          isGroup: false,
+          participants: ['legacy-sub-paul', 'sub-lena'],
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('does not treat the peer legacy sub as own messages', () => {
+    expect(
+      isMessageFromSelf(
+        'sub-lena',
+        'paul',
+        'sub-paul',
+        subMap,
+        handleToSub,
+        {
+          isGroup: false,
+          participants: ['sub-paul', 'sub-lena'],
+        },
+      ),
+    ).toBe(false);
   });
 });

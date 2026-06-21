@@ -8,6 +8,7 @@ import {
   isValidUsername,
   normalizeUsername,
   profileDisplayLabel,
+  repairParticipantSubs,
   usernameError,
 } from '../lib/util';
 
@@ -17,6 +18,7 @@ type Props = {
   open: boolean;
   mySub: string;
   myUsername: string;
+  handleToSub: Map<string, string>;
   existing: ConversationModel[];
   onClose: () => void;
   onCreated: (conversationId: string, conversation: ConversationModel) => void;
@@ -26,6 +28,7 @@ export default function NewChatModal({
   open,
   mySub,
   myUsername,
+  handleToSub,
   existing,
   onClose,
   onCreated,
@@ -120,13 +123,20 @@ export default function NewChatModal({
       const participants = [mySub, ...selectedSubs];
 
       if (selected.length === 1) {
-        const match = existing.find(
-          (c) =>
-            !c.isGroup &&
-            c.participants.length === 2 &&
-            c.participants.includes(selectedSubs[0]) &&
-            c.participants.includes(mySub),
-        );
+        const match = existing.find((c) => {
+          if (c.isGroup) return false;
+          const normalized = repairParticipantSubs(
+            c.participants.filter((p): p is string => !!p),
+            myUsername,
+            mySub,
+            handleToSub,
+          );
+          return (
+            normalized.length === 2 &&
+            normalized.includes(mySub) &&
+            normalized.includes(selectedSubs[0])
+          );
+        });
         if (match) {
           onCreated(match.id, match);
           return;

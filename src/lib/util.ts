@@ -302,6 +302,77 @@ export function repairParticipantSubs(
   return [...new Set(mapped)];
 }
 
+type ConversationLike = {
+  id: string;
+  isGroup?: boolean | null;
+  participants: (string | null)[];
+};
+
+/** Stable key for a 1:1 chat after resolving legacy participant ids. */
+export function directConversationPeerKey(
+  conversation: ConversationLike,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string | null {
+  if (conversation.isGroup) return null;
+  const subs = repairParticipantSubs(
+    conversation.participants.filter((participant): participant is string => !!participant),
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  if (subs.length !== 2) return null;
+  return subs.slice().sort().join(':');
+}
+
+/** Keep one 1:1 thread per person; prefer the conversation with latest activity. */
+export function dedupeDirectConversations<T extends ConversationLike>(
+  conversations: T[],
+  activityAt: (conversation: T) => string,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): T[] {
+  const bestByPeer = new Map<string, T>();
+
+  for (const conversation of conversations) {
+    if (conversation.isGroup) continue;
+    const key = directConversationPeerKey(
+      conversation,
+      myUsername,
+      mySub,
+      handleToSub,
+    );
+    if (!key) continue;
+
+    const existing = bestByPeer.get(key);
+    if (
+      !existing ||
+      new Date(activityAt(conversation)).getTime() >
+        new Date(activityAt(existing)).getTime()
+    ) {
+      bestByPeer.set(key, conversation);
+    }
+  }
+
+  const keptDirectIds = new Set(
+    [...bestByPeer.values()].map((conversation) => conversation.id),
+  );
+
+  return conversations.filter((conversation) => {
+    if (conversation.isGroup) return true;
+    const key = directConversationPeerKey(
+      conversation,
+      myUsername,
+      mySub,
+      handleToSub,
+    );
+    if (!key) return true;
+    return keptDirectIds.has(conversation.id);
+  });
+}
+
 function resolveParticipantSub(
   participant: string,
   myUsername: string,

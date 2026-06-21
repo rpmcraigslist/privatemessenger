@@ -57,6 +57,34 @@ export function countUnreadMessages(
   }).length;
 }
 
+/** Newest unread message from others (messages must be sorted oldest-first). */
+export function findLastUnreadMessage(
+  messages: MessageModel[],
+  lastReadAt: string | null,
+  myUsername: string,
+  mySub: string,
+  subToUsername: Map<string, string>,
+): MessageModel | null {
+  let lastUnread: MessageModel | null = null;
+  for (const message of messages) {
+    if (
+      isSameMessengerUser(
+        message.senderUsername,
+        myUsername,
+        mySub,
+        subToUsername,
+      )
+    ) {
+      continue;
+    }
+    if (!message.createdAt) continue;
+    if (!isReadThrough(lastReadAt, message.createdAt)) {
+      lastUnread = message;
+    }
+  }
+  return lastUnread;
+}
+
 /** @deprecated Prefer computeUnreadCounts with in-memory messages. */
 export async function fetchUnreadCount(
   conversationId: string,

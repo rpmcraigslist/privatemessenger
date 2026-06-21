@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { MessageModel } from './amplify';
 import {
   countUnreadMessages,
+  findLastUnreadMessage,
   getLastReadAt,
   isReadThrough,
   markConversationRead,
@@ -79,5 +80,55 @@ describe('read-state', () => {
         subMap,
       ),
     ).toBe(0);
+  });
+
+  it('findLastUnreadMessage returns the newest unread from others', () => {
+    const subMap = new Map<string, string>();
+    const messages: MessageModel[] = [
+      {
+        id: '1',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T11:00:00.000Z',
+        updatedAt: '2026-06-20T11:00:00.000Z',
+      } as MessageModel,
+      {
+        id: '2',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T12:00:00.000Z',
+        updatedAt: '2026-06-20T12:00:00.000Z',
+      } as MessageModel,
+      {
+        id: '3',
+        conversationId: 'conv-1',
+        senderUsername: 'me',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T13:00:00.000Z',
+        updatedAt: '2026-06-20T13:00:00.000Z',
+      } as MessageModel,
+    ];
+
+    expect(
+      findLastUnreadMessage(
+        messages,
+        '2026-06-20T10:00:00.000Z',
+        'me',
+        'my-sub',
+        subMap,
+      )?.id,
+    ).toBe('2');
+
+    expect(
+      findLastUnreadMessage(
+        messages,
+        '2026-06-20T12:00:00.000Z',
+        'me',
+        'my-sub',
+        subMap,
+      ),
+    ).toBeNull();
   });
 });

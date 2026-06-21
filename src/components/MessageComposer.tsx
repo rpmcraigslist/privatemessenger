@@ -117,7 +117,10 @@ export default function MessageComposer({
       }
 
       if (created) {
-        onMessageCreated?.(created);
+        onMessageCreated?.({
+          ...created,
+          conversationId: created.conversationId ?? conversation.id,
+        });
       }
 
       if (created?.id) {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 
-import { getLastReadAt, isReadThrough, markConversationRead } from '../lib/read-state';
+import { getLastReadAt, findLastUnreadMessage, isReadThrough, markConversationRead } from '../lib/read-state';
 
 import {
 
@@ -196,6 +196,8 @@ export default function ChatView({
 
   const stickToBottomRef = useRef(true);
 
+  const entryScrollDoneRef = useRef(false);
+
   const onConversationUpdatedRef = useRef(onConversationUpdated);
 
   onConversationUpdatedRef.current = onConversationUpdated;
@@ -286,29 +288,45 @@ export default function ChatView({
 
 
 
-  const scrollToMessage = useCallback((messageId: string, flash = true) => {
-
+  const scrollToMessage = useCallback((
+    messageId: string,
+    flashOrOptions:
+      | boolean
+      | {
+          flash?: boolean;
+          block?: ScrollLogicalPosition;
+          behavior?: ScrollBehavior;
+        } = true,
+  ): boolean => {
     const el = messageRefs.current.get(messageId);
+    if (!el) return false;
 
-    if (!el) return;
+    const options =
+      typeof flashOrOptions === 'boolean'
+        ? { flash: flashOrOptions }
+        : flashOrOptions;
 
     stickToBottomRef.current = false;
 
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.scrollIntoView({
+      behavior: options.behavior ?? 'smooth',
+      block: options.block ?? 'center',
+    });
 
-    if (!flash) return;
+    if (options.flash ?? true) {
+      setFlashMessageId(messageId);
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1800);
+    }
 
-    setFlashMessageId(messageId);
-
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-
-    flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1800);
-
+    return true;
   }, []);
 
 
 
   useEffect(() => {
+
+    entryScrollDoneRef.current = false;
 
     stickToBottomRef.current = true;
 
@@ -562,17 +580,93 @@ export default function ChatView({
 
 
 
+  const scrollToEntryPosition = useCallback(() => {
+
+    if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
+
+    const lastReadAt = getLastReadAt(mySub, conversation.id);
+
+    const lastUnread = findLastUnreadMessage(
+
+      messages,
+
+      lastReadAt,
+
+      myUsername,
+
+      mySub,
+
+      subToUsername,
+
+    );
+
+    let scrolled = false;
+
+    if (lastUnread) {
+
+      scrolled = scrollToMessage(lastUnread.id, {
+
+        flash: false,
+
+        block: 'end',
+
+        behavior: 'instant',
+
+      });
+
+    } else {
+
+      stickToBottomRef.current = true;
+
+      pinToBottom(true);
+
+      scrolled = true;
+
+    }
+
+    if (scrolled) {
+
+      entryScrollDoneRef.current = true;
+
+    }
+
+  }, [
+
+    conversation.id,
+
+    messages,
+
+    messagesSynced,
+
+    mySub,
+
+    myUsername,
+
+    pinToBottom,
+
+    scrollToMessage,
+
+    subToUsername,
+
+  ]);
+
+
+
   useEffect(() => {
 
-    stickToBottomRef.current = true;
+    requestAnimationFrame(() => {
 
-    requestAnimationFrame(() => pinToBottom(true));
+      requestAnimationFrame(() => scrollToEntryPosition());
 
-  }, [conversation.id, pinToBottom]);
+    });
+
+  }, [scrollToEntryPosition]);
 
 
 
   useEffect(() => {
+
+    if (!entryScrollDoneRef.current) return;
 
     if (!stickToBottomRef.current) return;
 
@@ -1036,7 +1130,13 @@ export default function ChatView({
 
                     deleting={deleteBusyId === m.id}
 
-                    onLayout={pinToBottom}
+                    onLayout={() => {
+
+                      if (!entryScrollDoneRef.current) return;
+
+                      pinToBottom();
+
+                    }}
 
                     onOpenMenu={(x, y) => openMessageMenu(m, mine, x, y)}
 

@@ -53,11 +53,17 @@ export function applyGlobalMessageSnapshot(
   existing: MessageModel[],
   snapshot: MessageModel[],
   optimisticIds: ReadonlySet<string>,
+  optimisticMessages: ReadonlyMap<string, MessageModel> = new Map(),
 ): MessageModel[] {
   const byId = new Map(snapshot.map((message) => [message.id, message]));
   for (const message of existing) {
     if (!byId.has(message.id) && optimisticIds.has(message.id)) {
       byId.set(message.id, message);
+    }
+  }
+  for (const id of optimisticIds) {
+    if (!byId.has(id) && optimisticMessages.has(id)) {
+      byId.set(id, optimisticMessages.get(id)!);
     }
   }
   return [...byId.values()];

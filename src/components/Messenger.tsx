@@ -177,6 +177,8 @@ export default function Messenger({ onSignOut }: Props) {
 
   const knownMessageIdsRef = useRef(new Set<string>());
 
+  const pendingOptimisticMessagesRef = useRef(new Map<string, MessageModel>());
+
   const messageSyncReadyRef = useRef(false);
 
   const chatBackRef = useRef<ChatBackHandle | null>(null);
@@ -443,6 +445,8 @@ export default function Messenger({ onSignOut }: Props) {
 
     knownMessageIdsRef.current.clear();
 
+    pendingOptimisticMessagesRef.current.clear();
+
     messageSyncReadyRef.current = false;
 
 
@@ -450,6 +454,16 @@ export default function Messenger({ onSignOut }: Props) {
     const sub = client.models.Message.observeQuery().subscribe({
 
       next: ({ items, isSynced }) => {
+
+        if (isSynced) {
+
+          for (const message of items) {
+
+            pendingOptimisticMessagesRef.current.delete(message.id);
+
+          }
+
+        }
 
         setAllMessages((prev) =>
 
@@ -462,6 +476,8 @@ export default function Messenger({ onSignOut }: Props) {
                 items,
 
                 knownMessageIdsRef.current,
+
+                pendingOptimisticMessagesRef.current,
 
               )
 
@@ -709,6 +725,8 @@ export default function Messenger({ onSignOut }: Props) {
 
   const handleMessageCreated = useCallback((message: MessageModel) => {
 
+    if (!message.id) return;
+
     const normalized =
 
       message.createdAt != null
@@ -719,15 +737,17 @@ export default function Messenger({ onSignOut }: Props) {
 
     knownMessageIdsRef.current.add(normalized.id);
 
+    pendingOptimisticMessagesRef.current.set(normalized.id, normalized);
+
     setAllMessages((prev) => mergeMessages(prev, [normalized]));
 
-    if (message.conversationId) {
+    if (normalized.conversationId) {
 
       setLatestByConversation((prev) => {
 
         const next = new Map(prev);
 
-        const current = next.get(message.conversationId!);
+        const current = next.get(normalized.conversationId!);
 
         if (
 
@@ -741,7 +761,7 @@ export default function Messenger({ onSignOut }: Props) {
 
         }
 
-        next.set(message.conversationId!, {
+        next.set(normalized.conversationId!, {
 
           preview: messageListPreview(normalized),
 
@@ -762,6 +782,8 @@ export default function Messenger({ onSignOut }: Props) {
   const handleMessageDeleted = useCallback((messageId: string) => {
 
     knownMessageIdsRef.current.delete(messageId);
+
+    pendingOptimisticMessagesRef.current.delete(messageId);
 
     setAllMessages((prev) => removeMessageById(prev, messageId));
 

@@ -58,6 +58,19 @@ describe('message-merge', () => {
     expect(result.map((m) => m.id).sort()).toEqual(['1', 'opt-1']);
   });
 
+  it('applyGlobalMessageSnapshot keeps pending optimistic sends not yet in local state', () => {
+    const snapshot = [msg('1', 'c1')];
+    const pending = msg('opt-1', 'c1');
+    const pendingMap = new Map([[pending.id, pending]]);
+    const result = applyGlobalMessageSnapshot(
+      [msg('1', 'c1')],
+      snapshot,
+      new Set(['opt-1']),
+      pendingMap,
+    );
+    expect(result.map((m) => m.id).sort()).toEqual(['1', 'opt-1']);
+  });
+
   it('removeMessageById filters a single row', () => {
     const existing = [msg('1', 'c1'), msg('2', 'c1')];
     expect(removeMessageById(existing, '2').map((m) => m.id)).toEqual(['1']);

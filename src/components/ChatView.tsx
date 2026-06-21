@@ -206,8 +206,6 @@ export default function ChatView({
 
   onConversationUpdatedRef.current = onConversationUpdated;
 
-  const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const latestMessagesRef = useRef<MessageModel[]>([]);
@@ -246,56 +244,6 @@ export default function ChatView({
     return messages.filter((m) => messageMatchesSearch(m, q)).map((m) => m.id);
 
   }, [messages, searchQuery]);
-
-
-
-  const flushMarkRead = useCallback(
-
-    (items: MessageModel[]) => {
-
-      const last = items[items.length - 1];
-
-      if (!last?.createdAt) return;
-
-      const previous = getLastReadAt(mySub, conversation.id);
-
-      if (isReadThrough(previous, last.createdAt)) return;
-
-      markConversationRead(mySub, conversation.id, last.createdAt);
-
-      onConversationUpdatedRef.current();
-
-    },
-
-    [conversation.id, mySub],
-
-  );
-
-
-
-  const scheduleMarkRead = useCallback(
-
-    (items: MessageModel[]) => {
-
-      latestMessagesRef.current = items;
-
-      if (markReadTimerRef.current) {
-
-        clearTimeout(markReadTimerRef.current);
-
-      }
-
-      markReadTimerRef.current = setTimeout(() => {
-
-        flushMarkRead(items);
-
-      }, 100);
-
-    },
-
-    [flushMarkRead],
-
-  );
 
 
 
@@ -447,15 +395,13 @@ export default function ChatView({
 
   useEffect(() => {
 
-    latestMessagesRef.current = messages;
-
     if (messages.length > 0) {
 
-      scheduleMarkRead(messages);
+      markVisibleMessagesRead(messages);
 
     }
 
-  }, [messages, scheduleMarkRead]);
+  }, [messages, markVisibleMessagesRead]);
 
 
 
@@ -463,13 +409,7 @@ export default function ChatView({
 
     return () => {
 
-      if (markReadTimerRef.current) {
-
-        clearTimeout(markReadTimerRef.current);
-
-      }
-
-      flushMarkRead(latestMessagesRef.current);
+      markVisibleMessagesRead(latestMessagesRef.current);
 
       if (flashTimerRef.current) {
 
@@ -479,7 +419,7 @@ export default function ChatView({
 
     };
 
-  }, [conversation.id, flushMarkRead]);
+  }, [conversation.id, markVisibleMessagesRead]);
 
 
 
@@ -595,7 +535,7 @@ export default function ChatView({
 
     if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
 
-    const lastReadAt = getLastReadAt(mySub, conversation.id);
+    const lastReadAt = getLastReadAt(mySub, myUsername, conversation.id);
 
     const lastUnread = findLastUnreadMessage(
 
@@ -635,6 +575,8 @@ export default function ChatView({
 
     }
 
+    markVisibleMessagesRead(messages);
+
     if (scrolled) {
 
       entryScrollDoneRef.current = true;
@@ -648,6 +590,8 @@ export default function ChatView({
     messages,
 
     messagesSynced,
+
+    markVisibleMessagesRead,
 
     mySub,
 

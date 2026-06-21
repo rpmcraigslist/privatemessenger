@@ -6,6 +6,7 @@ import {
   getLastReadAt,
   isReadThrough,
   markConversationRead,
+  markConversationReadThrough,
 } from './read-state';
 
 describe('read-state', () => {
@@ -14,14 +15,54 @@ describe('read-state', () => {
   });
 
   it('marks and reads conversation cursors', () => {
-    markConversationRead('sub-1', 'conv-1', '2026-06-20T12:00:00.000Z');
-    expect(getLastReadAt('sub-1', 'conv-1')).toBe('2026-06-20T12:00:00.000Z');
-    expect(getLastReadAt('sub-1', 'conv-2')).toBeNull();
+    markConversationRead('sub-1', 'alice', 'conv-1', '2026-06-20T12:00:00.000Z');
+    expect(getLastReadAt('sub-1', 'alice', 'conv-1')).toBe(
+      '2026-06-20T12:00:00.000Z',
+    );
+    expect(getLastReadAt('sub-1', 'alice', 'conv-2')).toBeNull();
+  });
+
+  it('falls back to username-scoped read cursor keys', () => {
+    markConversationRead('old-sub', 'alice', 'conv-1', '2026-06-20T12:00:00.000Z');
+    expect(getLastReadAt('new-sub', 'alice', 'conv-1')).toBe(
+      '2026-06-20T12:00:00.000Z',
+    );
   });
 
   it('treats equal timestamps as read', () => {
     const at = '2026-06-20T12:00:00.000Z';
     expect(isReadThrough(at, at)).toBe(true);
+  });
+
+  it('marks through the latest message timestamp in the list', () => {
+    const messages: MessageModel[] = [
+      {
+        id: '1',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T11:00:00.000Z',
+        updatedAt: '2026-06-20T11:00:00.000Z',
+      } as MessageModel,
+      {
+        id: '2',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T13:00:00.000Z',
+        updatedAt: '2026-06-20T13:00:00.000Z',
+      } as MessageModel,
+    ];
+
+    expect(
+      markConversationReadThrough('sub-1', 'alice', 'conv-1', messages),
+    ).toBe(true);
+    expect(getLastReadAt('sub-1', 'alice', 'conv-1')).toBe(
+      '2026-06-20T13:00:00.000Z',
+    );
+    expect(
+      countUnreadMessages(messages, getLastReadAt('sub-1', 'alice', 'conv-1'), 'alice', 'sub-1', new Map()),
+    ).toBe(0);
   });
 
   it('counts only messages from others after the read cursor', () => {

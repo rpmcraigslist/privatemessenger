@@ -52,7 +52,7 @@ describe('unread-counts', () => {
   });
 
   it('updates after a conversation is marked read', () => {
-    markConversationRead('my-sub', 'c2', '2026-06-20T11:00:00.000Z');
+    markConversationRead('my-sub', 'me', 'c2', '2026-06-20T11:00:00.000Z');
 
     const counts = computeUnreadCounts(
       [conversation('c2')],

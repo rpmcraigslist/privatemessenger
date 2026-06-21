@@ -30,8 +30,6 @@ import {
 
   applyGlobalMessageSnapshot,
 
-  mergeConversationMessages,
-
   mergeMessages,
 
   removeMessageById,
@@ -41,6 +39,8 @@ import {
 import {
 
   buildParticipantDirectory,
+
+  buildHandleToSubDirectory,
 
   conversationTitle,
 
@@ -138,6 +138,12 @@ export default function Messenger({ onSignOut }: Props) {
   const [readRevision, setReadRevision] = useState(0);
 
   const [subToUsername, setSubToUsername] = useState<Map<string, string>>(
+
+    () => new Map(),
+
+  );
+
+  const [handleToSub, setHandleToSub] = useState<Map<string, string>>(
 
     () => new Map(),
 
@@ -282,6 +288,8 @@ export default function Messenger({ onSignOut }: Props) {
       const profiles = await loadUserDirectory();
 
       setSubToUsername(buildParticipantDirectory(profiles));
+
+      setHandleToSub(buildHandleToSubDirectory(profiles));
 
     } catch (err) {
 
@@ -629,54 +637,6 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-  useEffect(() => {
-
-    if (!user || !selectedId) return;
-
-
-
-    const sub = client.models.Message.observeQuery({
-
-      filter: { conversationId: { eq: selectedId } },
-
-    }).subscribe({
-
-      next: ({ items }) => {
-
-        setAllMessages((prev) =>
-
-          mergeConversationMessages(
-
-            prev,
-
-            selectedId,
-
-            items,
-
-            knownMessageIdsRef.current,
-
-          ),
-
-        );
-
-      },
-
-      error: (err) => {
-
-        console.error('active conversation message subscription error', err);
-
-      },
-
-    });
-
-
-
-    return () => sub.unsubscribe();
-
-  }, [user?.cognitoSub, selectedId]);
-
-
-
   const conversationsForList = useMemo(
 
     () =>
@@ -749,9 +709,17 @@ export default function Messenger({ onSignOut }: Props) {
 
   const handleMessageCreated = useCallback((message: MessageModel) => {
 
-    knownMessageIdsRef.current.add(message.id);
+    const normalized =
 
-    setAllMessages((prev) => mergeMessages(prev, [message]));
+      message.createdAt != null
+
+        ? message
+
+        : { ...message, createdAt: new Date().toISOString() };
+
+    knownMessageIdsRef.current.add(normalized.id);
+
+    setAllMessages((prev) => mergeMessages(prev, [normalized]));
 
     if (message.conversationId) {
 
@@ -765,7 +733,7 @@ export default function Messenger({ onSignOut }: Props) {
 
           current &&
 
-          new Date(current.at).getTime() >= new Date(message.createdAt).getTime()
+          new Date(current.at).getTime() >= new Date(normalized.createdAt).getTime()
 
         ) {
 
@@ -775,9 +743,9 @@ export default function Messenger({ onSignOut }: Props) {
 
         next.set(message.conversationId!, {
 
-          preview: messageListPreview(message),
+          preview: messageListPreview(normalized),
 
-          at: message.createdAt,
+          at: normalized.createdAt,
 
         });
 
@@ -1072,6 +1040,8 @@ export default function Messenger({ onSignOut }: Props) {
             myUsername={user.username}
 
             mySub={user.cognitoSub}
+
+            handleToSub={handleToSub}
 
             subToUsername={subToUsername}
 

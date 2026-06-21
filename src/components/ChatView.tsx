@@ -51,6 +51,8 @@ type Props = {
 
   mySub: string;
 
+  handleToSub: Map<string, string>;
+
   subToUsername: Map<string, string>;
 
   chatBackRef?: MutableRefObject<ChatBackHandle | null>;
@@ -98,6 +100,8 @@ export default function ChatView({
   myUsername,
 
   mySub,
+
+  handleToSub,
 
   subToUsername,
 
@@ -1101,6 +1105,10 @@ export default function ChatView({
         conversation={conversation}
 
         myUsername={myUsername}
+
+        mySub={mySub}
+
+        handleToSub={handleToSub}
 
         subToUsername={subToUsername}
 

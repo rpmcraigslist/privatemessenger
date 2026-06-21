@@ -115,6 +115,13 @@ type DirectoryEntry = {
 async function listUserDirectory(): Promise<DirectoryEntry[]> {
   const client = await dataClientPromise;
   const cognitoUsers = await listUsers();
+  const validSubs = new Set(
+    cognitoUsers.map((user) => user.cognitoSub).filter(Boolean) as string[],
+  );
+  const validHandles = new Set(
+    cognitoUsers.map((user) => user.username.trim().toLowerCase()),
+  );
+
   for (const user of cognitoUsers) {
     try {
       await ensureProfileForCognitoUser(client, user);
@@ -124,6 +131,28 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
   }
 
   const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
+
+  for (const profile of profiles.data) {
+    const handle = profile.username.trim().toLowerCase();
+    const isStub = !profile.cognitoSub;
+    const staleSub =
+      profile.cognitoSub != null && !validSubs.has(profile.cognitoSub);
+    const orphanForSignedInHandle =
+      validHandles.has(handle) && (isStub || staleSub);
+
+    if (orphanForSignedInHandle) {
+      try {
+        await client.models.UserProfile.delete(
+          { id: profile.id },
+          { authMode: 'iam' },
+        );
+      } catch (err) {
+        console.error('failed to delete orphan profile', profile.id, err);
+      }
+    }
+  }
+
+  const refreshed = await client.models.UserProfile.list({ authMode: 'iam' });
   const byUsername = new Map<
     string,
     {
@@ -136,11 +165,11 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
   >();
   const bySub = new Map<string, (typeof byUsername extends Map<string, infer V> ? V : never)>();
 
-  for (const profile of profiles.data) {
+  for (const profile of refreshed.data) {
     if (!isValidMessengerHandle(profile.username)) continue;
     if (profile.cognitoSub && profile.username === profile.cognitoSub) continue;
     if (!profile.cognitoSub) {
-      const signedInSibling = profiles.data.find(
+      const signedInSibling = refreshed.data.find(
         (other) =>
           other.id !== profile.id &&
           other.username === profile.username &&
@@ -193,7 +222,14 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
   const onePerUsername = new Map<string, DirectoryEntry>();
   for (const entry of result) {
     const existing = onePerUsername.get(entry.username);
-    if (!existing || (!existing.cognitoSub && entry.cognitoSub)) {
+    const entryValid = entry.cognitoSub != null && validSubs.has(entry.cognitoSub);
+    const existingValid =
+      existing?.cognitoSub != null && validSubs.has(existing.cognitoSub);
+    if (
+      !existing ||
+      (!existingValid && entryValid) ||
+      (!existing.cognitoSub && entry.cognitoSub)
+    ) {
       onePerUsername.set(entry.username, entry);
     }
   }

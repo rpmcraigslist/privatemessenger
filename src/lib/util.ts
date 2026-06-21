@@ -272,6 +272,63 @@ export function buildParticipantDirectory(
   return map;
 }
 
+/** Reverse of buildParticipantDirectory: bare handle → Cognito sub. */
+export function buildHandleToSubDirectory(
+  profiles: { username: string; cognitoSub?: string | null }[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const profile of profiles) {
+    const handle = normalizeProfileHandle(profile.username);
+    if (!handle || !profile.cognitoSub || !isCognitoUuid(profile.cognitoSub)) {
+      continue;
+    }
+    map.set(handle, profile.cognitoSub);
+  }
+  return map;
+}
+
+/** Normalize conversation participant ids to Cognito subs for owner auth. */
+export function repairParticipantSubs(
+  participants: string[],
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string[] {
+  const mapped = participants
+    .filter((participant): participant is string => !!participant)
+    .map((participant) =>
+      resolveParticipantSub(participant, myUsername, mySub, handleToSub),
+    );
+  return [...new Set(mapped)];
+}
+
+function resolveParticipantSub(
+  participant: string,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string {
+  if (isCognitoUuid(participant)) return participant;
+
+  const value = participant.toLowerCase();
+  const handle = myUsername.toLowerCase();
+  const loginId = toLoginId(myUsername).toLowerCase();
+  if (
+    value === mySub.toLowerCase() ||
+    value === handle ||
+    value === loginId
+  ) {
+    return mySub;
+  }
+
+  const bareHandle = normalizeProfileHandle(participant);
+  if (bareHandle && handleToSub.has(bareHandle)) {
+    return handleToSub.get(bareHandle)!;
+  }
+
+  return participant;
+}
+
 export function resolveParticipantHandle(
   participant: string,
   subToUsername: Map<string, string>,

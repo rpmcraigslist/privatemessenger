@@ -5,12 +5,15 @@ import {
   formatBytes,
   messageListPreview,
   participantDisplayName,
+  repairParticipantSubs,
   type ReplyTarget,
 } from '../lib/util';
 
 type Props = {
   conversation: ConversationModel;
   myUsername: string;
+  mySub: string;
+  handleToSub: Map<string, string>;
   subToUsername: Map<string, string>;
   replyTo?: ReplyTarget | null;
   onCancelReply?: () => void;
@@ -23,6 +26,8 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB guardrail.
 export default function MessageComposer({
   conversation,
   myUsername,
+  mySub,
+  handleToSub,
   subToUsername,
   replyTo,
   onCancelReply,
@@ -83,8 +88,11 @@ export default function MessageComposer({
         type = file.type.startsWith('image/') ? 'image' : 'file';
       }
 
-      const participantUsernames = conversation.participants.filter(
-        (p): p is string => !!p,
+      const participantUsernames = repairParticipantSubs(
+        conversation.participants.filter((p): p is string => !!p),
+        myUsername,
+        mySub,
+        handleToSub,
       );
 
       const { data: created, errors: createErrors } = await client.models.Message.create({

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { dedupeUserProfiles, isSameMessengerUser } from './util';
+import {
+  dedupeUserProfiles,
+  isSameMessengerUser,
+  repairParticipantSubs,
+} from './util';
 
 describe('dedupeUserProfiles', () => {
   it('keeps one row per cognito sub', () => {
@@ -43,6 +47,20 @@ describe('dedupeUserProfiles', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.cognitoSub).toBe('sub-real');
+  });
+});
+
+describe('repairParticipantSubs', () => {
+  const handleToSub = new Map([['bob', 'sub-b']]);
+
+  it('maps login ids and handles to cognito subs', () => {
+    const result = repairParticipantSubs(
+      ['alice@messenger.local', 'sub-b', 'bob'],
+      'alice',
+      'sub-a',
+      handleToSub,
+    );
+    expect(result.sort()).toEqual(['sub-a', 'sub-b']);
   });
 });
 

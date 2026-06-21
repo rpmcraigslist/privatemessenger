@@ -3,23 +3,46 @@ import { isSameMessengerUser } from './util';
 
 const PREFIX = 'messenger:read:';
 
-function storageKey(sub: string, conversationId: string): string {
-  return `${PREFIX}${sub}:${conversationId}`;
+function storageKeys(
+  sub: string,
+  username: string,
+  conversationId: string,
+): string[] {
+  const handle = username.trim().toLowerCase();
+  return [
+    `${PREFIX}${sub}:${conversationId}`,
+    `${PREFIX}user:${handle}:${conversationId}`,
+  ];
 }
 
 export function getLastReadAt(
   sub: string,
+  username: string,
   conversationId: string,
 ): string | null {
-  return localStorage.getItem(storageKey(sub, conversationId));
+  let latest: string | null = null;
+  for (const key of storageKeys(sub, username, conversationId)) {
+    const value = localStorage.getItem(key);
+    if (!value) continue;
+    if (
+      !latest ||
+      new Date(value).getTime() > new Date(latest).getTime()
+    ) {
+      latest = value;
+    }
+  }
+  return latest;
 }
 
 export function markConversationRead(
   sub: string,
+  username: string,
   conversationId: string,
   readAtIso: string,
 ): void {
-  localStorage.setItem(storageKey(sub, conversationId), readAtIso);
+  for (const key of storageKeys(sub, username, conversationId)) {
+    localStorage.setItem(key, readAtIso);
+  }
 }
 
 /** True when lastReadAt covers messageCreatedAt (timestamp-safe). */
@@ -32,6 +55,40 @@ export function isReadThrough(
   const messageMs = new Date(messageCreatedAt).getTime();
   if (Number.isNaN(readMs) || Number.isNaN(messageMs)) return false;
   return readMs >= messageMs;
+}
+
+export function latestMessageTimestamp(
+  messages: readonly { createdAt?: string | null }[],
+): string | null {
+  let latest: string | null = null;
+  for (const message of messages) {
+    const createdAt = message.createdAt;
+    if (!createdAt) continue;
+    if (
+      !latest ||
+      new Date(createdAt).getTime() > new Date(latest).getTime()
+    ) {
+      latest = createdAt;
+    }
+  }
+  return latest;
+}
+
+/** Advance the read cursor through all messages currently in view. */
+export function markConversationReadThrough(
+  sub: string,
+  username: string,
+  conversationId: string,
+  messages: readonly { createdAt?: string | null }[],
+): boolean {
+  const latest = latestMessageTimestamp(messages);
+  if (!latest) return false;
+
+  const previous = getLastReadAt(sub, username, conversationId);
+  if (isReadThrough(previous, latest)) return false;
+
+  markConversationRead(sub, username, conversationId, latest);
+  return true;
 }
 
 export function countUnreadMessages(
@@ -111,11 +168,5 @@ export function readCursorForMessages(
   lastReadAt: string | null,
   messages: { createdAt?: string | null }[],
 ): string | null {
-  if (messages.length === 0) return lastReadAt;
-  const latest = messages[messages.length - 1]?.createdAt;
-  if (!latest) return lastReadAt;
-  if (!lastReadAt) return latest;
-  return new Date(latest).getTime() >= new Date(lastReadAt).getTime()
-    ? latest
-    : lastReadAt;
+  return latestMessageTimestamp(messages) ?? lastReadAt;
 }

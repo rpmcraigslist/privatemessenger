@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 
-import { getLastReadAt, findLastUnreadMessage, isReadThrough, markConversationRead } from '../lib/read-state';
+import {
+  findLastUnreadMessage,
+  getLastReadAt,
+  markConversationReadThrough,
+} from '../lib/read-state';
 
 import {
 
@@ -208,23 +212,30 @@ export default function ChatView({
 
   const latestMessagesRef = useRef<MessageModel[]>([]);
 
-
-
-  const title = conversationTitle(
-
-    conversation.participants,
-
-    conversation.name,
-
-    mySub,
-
-    myUsername,
-
-    subToUsername,
-
+  const markVisibleMessagesRead = useCallback(
+    (items: MessageModel[]) => {
+      latestMessagesRef.current = items;
+      if (
+        markConversationReadThrough(
+          mySub,
+          myUsername,
+          conversation.id,
+          items,
+        )
+      ) {
+        onConversationUpdatedRef.current();
+      }
+    },
+    [conversation.id, mySub, myUsername],
   );
 
-
+  const title = conversationTitle(
+    conversation.participants,
+    conversation.name,
+    mySub,
+    myUsername,
+    subToUsername,
+  );
 
   const searchMatches = useMemo(() => {
 

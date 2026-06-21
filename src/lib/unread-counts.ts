@@ -24,7 +24,7 @@ export function computeUnreadCounts(
       counts.set(conversation.id, 0);
       continue;
     }
-    const lastReadAt = getLastReadAt(mySub, conversation.id);
+    const lastReadAt = getLastReadAt(mySub, myUsername, conversation.id);
     const messages = messagesByConversation.get(conversation.id) ?? [];
     counts.set(
       conversation.id,

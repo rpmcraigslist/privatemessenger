@@ -98,6 +98,46 @@ const schema = a
       deletedConversations: a.integer().required(),
     }),
 
+    AdminAuditCognitoUser: a.customType({
+      username: a.string().required(),
+      cognitoSub: a.string(),
+      status: a.string().required(),
+    }),
+
+    AdminAuditProfileRow: a.customType({
+      id: a.string().required(),
+      username: a.string().required(),
+      cognitoSub: a.string(),
+      orphan: a.boolean().required(),
+    }),
+
+    AdminAuditDuplicateChat: a.customType({
+      peerKey: a.string().required(),
+      conversationIds: a.string().array().required(),
+    }),
+
+    AdminAuditMessengerResult: a.customType({
+      cognitoUsers: a.ref('AdminAuditCognitoUser').array().required(),
+      profileRows: a.ref('AdminAuditProfileRow').array().required(),
+      duplicateProfileHandles: a.string().array().required(),
+      duplicateDirectChats: a.ref('AdminAuditDuplicateChat').array().required(),
+    }),
+
+    AdminPurgeDirectChatResult: a.customType({
+      usernameA: a.string().required(),
+      usernameB: a.string().required(),
+      deletedMessages: a.integer().required(),
+      deletedConversations: a.integer().required(),
+    }),
+
+    AdminReconcileMessengerResult: a.customType({
+      profilesConsolidated: a.integer().required(),
+      orphanProfilesRemoved: a.integer().required(),
+      duplicateConversationsRemoved: a.integer().required(),
+      messagesRemoved: a.integer().required(),
+      conversationsNormalized: a.integer().required(),
+    }),
+
     DeleteMyMessageResult: a.customType({
       messageId: a.string().required(),
       deleted: a.boolean().required(),
@@ -194,6 +234,28 @@ const schema = a
     adminClearMessages: a
       .mutation()
       .returns(a.ref('AdminClearMessagesResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminAuditMessenger: a
+      .query()
+      .returns(a.ref('AdminAuditMessengerResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminPurgeDirectChat: a
+      .mutation()
+      .arguments({
+        usernameA: a.string().required(),
+        usernameB: a.string().required(),
+      })
+      .returns(a.ref('AdminPurgeDirectChatResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminReconcileMessenger: a
+      .mutation()
+      .returns(a.ref('AdminReconcileMessengerResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

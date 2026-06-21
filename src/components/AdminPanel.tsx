@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { client } from '../lib/amplify';
 import {
   formatUserHandle,
@@ -16,13 +16,34 @@ type AdminUser = {
   status: string;
 };
 
+type AuditResult = {
+  cognitoUsers: {
+    username: string;
+    cognitoSub?: string | null;
+    status: string;
+  }[];
+  profileRows: {
+    id: string;
+    username: string;
+    cognitoSub?: string | null;
+    orphan: boolean;
+  }[];
+  duplicateProfileHandles: string[];
+  duplicateDirectChats: {
+    peerKey: string;
+    conversationIds: string[];
+  }[];
+};
+
 type Props = {
   onClose: () => void;
 };
 
 export default function AdminPanel({ onClose }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [audit, setAudit] = useState<AuditResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,6 +52,8 @@ export default function AdminPanel({ onClose }: Props) {
   const [tempPassword, setTempPassword] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [forceChange, setForceChange] = useState(true);
+  const [purgeUserA, setPurgeUserA] = useState('paul');
+  const [purgeUserB, setPurgeUserB] = useState('lena');
 
   async function loadUsers() {
     setLoading(true);
@@ -46,9 +69,24 @@ export default function AdminPanel({ onClose }: Props) {
     }
   }
 
+  const loadAudit = useCallback(async () => {
+    setAuditLoading(true);
+    setError(null);
+    try {
+      const { data, errors } = await client.queries.adminAuditMessenger();
+      if (errors?.length) throw new Error(errors[0].message);
+      setAudit((data ?? null) as AuditResult | null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to audit messenger data');
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadUsers();
-  }, []);
+    void loadAudit();
+  }, [loadAudit]);
 
   async function createUser(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +129,7 @@ export default function AdminPanel({ onClose }: Props) {
       setTempPassword('');
       setNewPhone('');
       await loadUsers();
+      await loadAudit();
     } catch (err) {
       console.error('adminCreateUser failed', err);
       setError(err instanceof Error ? err.message : 'Create failed');
@@ -130,6 +169,7 @@ export default function AdminPanel({ onClose }: Props) {
       if (errors?.length) throw new Error(errors[0].message);
       setMessage(`Removed ${username}`);
       await loadUsers();
+      await loadAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
     } finally {
@@ -152,6 +192,7 @@ export default function AdminPanel({ onClose }: Props) {
       if (errors?.length) throw new Error(errors[0].message);
       setMessage(`Removed ${data?.deleted ?? 0} user(s).`);
       await loadUsers();
+      await loadAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Purge failed');
     } finally {
@@ -169,8 +210,78 @@ export default function AdminPanel({ onClose }: Props) {
       setMessage(
         `Cleared ${data?.deletedMessages ?? 0} message(s) and removed ${data?.deletedConversations ?? 0} conversation(s).`,
       );
+      await loadAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Clear failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function purgeDirectChat() {
+    const usernameA = normalizeUsername(purgeUserA);
+    const usernameB = normalizeUsername(purgeUserB);
+    const errA = usernameError(usernameA);
+    const errB = usernameError(usernameB);
+    if (errA || errB) {
+      setError(errA ?? errB);
+      return;
+    }
+    if (
+      !confirm(
+        `Delete every direct message and conversation between ${usernameA} and ${usernameB}?`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { data, errors } = await client.mutations.adminPurgeDirectChat({
+        usernameA,
+        usernameB,
+      });
+      if (errors?.length) throw new Error(errors[0].message);
+      setMessage(
+        `Removed ${data?.deletedMessages ?? 0} message(s) and ${data?.deletedConversations ?? 0} direct chat(s) between ${usernameA} and ${usernameB}.`,
+      );
+      await loadAudit();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Direct chat purge failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reconcileMessenger() {
+    if (
+      !confirm(
+        'Consolidate duplicate profiles, remove duplicate 1:1 chats, and normalize participant ids?',
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { data, errors } = await client.mutations.adminReconcileMessenger();
+      if (errors?.length) throw new Error(errors[0].message);
+      setMessage(
+        [
+          `Profiles consolidated: ${data?.profilesConsolidated ?? 0}.`,
+          `Orphan profiles removed: ${data?.orphanProfilesRemoved ?? 0}.`,
+          `Duplicate chats removed: ${data?.duplicateConversationsRemoved ?? 0}.`,
+          `Messages removed with duplicate chats: ${data?.messagesRemoved ?? 0}.`,
+          `Conversations normalized: ${data?.conversationsNormalized ?? 0}.`,
+        ].join(' '),
+      );
+      await loadAudit();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reconcile failed');
     } finally {
       setBusy(false);
     }
@@ -204,6 +315,98 @@ export default function AdminPanel({ onClose }: Props) {
           {error && (
             <p className="mb-3 text-sm text-red-400">{error}</p>
           )}
+
+          <section className="mb-6">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="font-medium">Data audit</h3>
+              <button
+                type="button"
+                onClick={() => void loadAudit()}
+                disabled={busy || auditLoading}
+                className="text-sm text-[var(--color-accent)] hover:underline disabled:opacity-40"
+              >
+                Refresh
+              </button>
+            </div>
+            {auditLoading && !audit ? (
+              <p className="text-sm text-[var(--color-muted)]">Checking data…</p>
+            ) : audit ? (
+              <div className="space-y-2 rounded-lg bg-[var(--color-panel-2)] px-3 py-3 text-sm">
+                <p>
+                  Cognito accounts: <strong>{audit.cognitoUsers.length}</strong>
+                </p>
+                <p>
+                  Profile rows in database: <strong>{audit.profileRows.length}</strong>
+                </p>
+                {audit.duplicateProfileHandles.length > 0 ? (
+                  <p className="text-amber-300">
+                    Duplicate profile handles:{' '}
+                    {audit.duplicateProfileHandles.join(', ')}
+                  </p>
+                ) : (
+                  <p className="text-[var(--color-muted)]">
+                    No duplicate profile handles found.
+                  </p>
+                )}
+                {audit.duplicateDirectChats.length > 0 ? (
+                  <p className="text-amber-300">
+                    Duplicate 1:1 chats: {audit.duplicateDirectChats.length} pair(s)
+                  </p>
+                ) : (
+                  <p className="text-[var(--color-muted)]">
+                    No duplicate 1:1 chats found.
+                  </p>
+                )}
+                {audit.profileRows.some((row) => row.orphan) && (
+                  <p className="text-amber-300">
+                    Orphan profile rows detected. Run reconcile to remove them.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </section>
+
+          <section className="mb-6">
+            <h3 className="mb-2 font-medium">Cleanup</h3>
+            <div className="space-y-2 rounded-lg border border-white/10 px-3 py-3">
+              <p className="text-sm text-[var(--color-muted)]">
+                Remove all direct messages between two users and delete their 1:1
+                conversation threads.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={purgeUserA}
+                  onChange={(e) => setPurgeUserA(e.target.value)}
+                  placeholder="Username A"
+                  autoComplete="off"
+                  className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                />
+                <input
+                  value={purgeUserB}
+                  onChange={(e) => setPurgeUserB(e.target.value)}
+                  placeholder="Username B"
+                  autoComplete="off"
+                  className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void purgeDirectChat()}
+                disabled={busy}
+                className="w-full rounded-lg border border-amber-400/40 px-3 py-2 text-sm text-amber-300 hover:bg-amber-400/10 disabled:opacity-40"
+              >
+                Purge direct chat
+              </button>
+              <button
+                type="button"
+                onClick={() => void reconcileMessenger()}
+                disabled={busy}
+                className="w-full rounded-lg border border-[var(--color-accent)]/40 px-3 py-2 text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-40"
+              >
+                Reconcile profiles and chats
+              </button>
+            </div>
+          </section>
 
           <section className="mb-6">
             <h3 className="mb-2 font-medium">Add user</h3>

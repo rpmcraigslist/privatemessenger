@@ -17,6 +17,11 @@ import {
   isValidMessengerHandle,
 } from '../shared/profile-consolidation';
 import {
+  auditMessengerData,
+  purgeDirectChatBetween,
+  reconcileMessengerData,
+} from '../shared/messenger-reconcile';
+import {
   fromLoginId,
   isAdminGroupMember,
   isCognitoUuid,
@@ -259,6 +264,8 @@ type AdminEvent = {
   identity: unknown;
   arguments: {
     username?: string;
+    usernameA?: string;
+    usernameB?: string;
     temporaryPassword?: string;
     phoneNumber?: string | null;
     forcePasswordChange?: boolean | null;
@@ -315,6 +322,50 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
   switch (field) {
     case 'adminListUsers':
       return listUsers();
+    case 'adminAuditMessenger': {
+      const client = await dataClientPromise;
+      const users = await listUsers();
+      const statuses = new Map(users.map((user) => [user.username, user.status]));
+      return auditMessengerData(
+        client,
+        users.map((user) => ({
+          loginId: user.loginId,
+          username: user.username,
+          cognitoSub: user.cognitoSub,
+        })),
+        statuses,
+      );
+    }
+    case 'adminPurgeDirectChat': {
+      const { usernameA, usernameB } = event.arguments;
+      if (!usernameA || !usernameB) {
+        throw new Error('usernameA and usernameB are required');
+      }
+      const client = await dataClientPromise;
+      const users = await listUsers();
+      return purgeDirectChatBetween(
+        client,
+        users.map((user) => ({
+          loginId: user.loginId,
+          username: user.username,
+          cognitoSub: user.cognitoSub,
+        })),
+        usernameA,
+        usernameB,
+      );
+    }
+    case 'adminReconcileMessenger': {
+      const client = await dataClientPromise;
+      const users = await listUsers();
+      return reconcileMessengerData(
+        client,
+        users.map((user) => ({
+          loginId: user.loginId,
+          username: user.username,
+          cognitoSub: user.cognitoSub,
+        })),
+      );
+    }
     case 'adminCreateUser': {
       const { username, temporaryPassword, phoneNumber, forcePasswordChange } =
         event.arguments;

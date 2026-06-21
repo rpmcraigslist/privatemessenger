@@ -44,8 +44,6 @@ import {
 
   conversationTitle,
 
-  dedupeDirectConversations,
-
   isSameMessengerUser,
 
   messageListPreview,
@@ -435,37 +433,9 @@ export default function Messenger({ onSignOut }: Props) {
 
     }
 
-    const merged = [...byId.values()];
+    return [...byId.values()];
 
-    if (!user) return merged;
-
-    return dedupeDirectConversations(
-
-      merged,
-
-      (conversation) => conversationActivityAt(conversation, latestByConversation),
-
-      user.username,
-
-      user.cognitoSub,
-
-      handleToSub,
-
-    );
-
-  }, [
-
-    conversations,
-
-    handleToSub,
-
-    latestByConversation,
-
-    optimisticConversations,
-
-    user,
-
-  ]);
+  }, [conversations, optimisticConversations]);
 
 
 

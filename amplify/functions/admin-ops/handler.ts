@@ -196,7 +196,11 @@ type DirectoryEntry = {
 async function listUserDirectory(): Promise<DirectoryEntry[]> {
   const cognitoUsers = await listUsers();
   for (const user of cognitoUsers) {
-    await syncProfileForCognitoUser(user);
+    try {
+      await syncProfileForCognitoUser(user);
+    } catch (err) {
+      console.error('profile reconcile failed for', user.username, err);
+    }
   }
 
   const client = await dataClientPromise;
@@ -217,6 +221,15 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
     if (!/^[a-z0-9._-]{3,32}$/.test(profile.username)) continue;
     if (isCognitoUuid(profile.username)) continue;
     if (profile.cognitoSub && profile.username === profile.cognitoSub) continue;
+    if (!profile.cognitoSub) {
+      const signedInSibling = profiles.data.find(
+        (other) =>
+          other.id !== profile.id &&
+          other.username === profile.username &&
+          other.cognitoSub,
+      );
+      if (signedInSibling) continue;
+    }
     const rawTitle = profile.displayName?.trim();
     const displayName =
       rawTitle && !isCognitoUuid(rawTitle) ? rawTitle : profile.username;
@@ -259,7 +272,15 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
     result.push(entry);
   }
 
-  return result;
+  const onePerUsername = new Map<string, DirectoryEntry>();
+  for (const entry of result) {
+    const existing = onePerUsername.get(entry.username);
+    if (!existing || (!existing.cognitoSub && entry.cognitoSub)) {
+      onePerUsername.set(entry.username, entry);
+    }
+  }
+
+  return [...onePerUsername.values()];
 }
 
 async function ensureProfileStub(

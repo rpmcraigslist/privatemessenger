@@ -135,7 +135,8 @@ export async function ensureValidSession(): Promise<boolean> {
   try {
     await resolveCurrentUser();
     return true;
-  } catch {
+  } catch (err) {
+    console.error('session validation failed', err);
     try {
       await signOutAndClear();
     } catch {
@@ -151,7 +152,10 @@ export async function signInWithUsername(
 ): Promise<SignInOutput> {
   rememberSignInHandle(username);
   try {
-    await signOut();
+    const session = await fetchAuthSession();
+    if (session.tokens?.accessToken) {
+      await signOut();
+    }
   } catch {
     // ignore — no active session
   }

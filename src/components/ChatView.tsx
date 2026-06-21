@@ -560,6 +560,16 @@ export default function ChatView({
 
   useEffect(() => {
 
+    stickToBottomRef.current = true;
+
+    requestAnimationFrame(() => pinToBottom(true));
+
+  }, [conversation.id, pinToBottom]);
+
+
+
+  useEffect(() => {
+
     if (!stickToBottomRef.current) return;
 
     requestAnimationFrame(() => pinToBottom());
@@ -622,7 +632,7 @@ export default function ChatView({
 
   return (
 
-    <>
+    <div className="flex h-full min-h-0 flex-col">
 
       <header className="flex items-center gap-3 border-b border-black/30 bg-[var(--color-panel)] px-3 py-2.5">
 
@@ -1132,7 +1142,7 @@ export default function ChatView({
 
       )}
 
-    </>
+    </div>
 
   );
 

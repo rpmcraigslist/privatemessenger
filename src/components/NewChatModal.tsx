@@ -19,7 +19,7 @@ type Props = {
   myUsername: string;
   existing: ConversationModel[];
   onClose: () => void;
-  onCreated: (conversationId: string) => void;
+  onCreated: (conversationId: string, conversation: ConversationModel) => void;
 };
 
 export default function NewChatModal({
@@ -62,9 +62,13 @@ export default function NewChatModal({
   const typed = normalizeUsername(query);
   const filtered = useMemo(() => {
     const q = typed;
+    const signedInHandles = new Set(
+      directory.filter((p) => p.cognitoSub).map((p) => p.username),
+    );
     return directory.filter(
       (p) =>
         !selected.includes(p.username) &&
+        (!signedInHandles.has(p.username) || p.cognitoSub) &&
         (q === '' ||
           p.username.includes(q) ||
           (p.displayName ?? '').toLowerCase().includes(q)),
@@ -124,7 +128,7 @@ export default function NewChatModal({
             c.participants.includes(mySub),
         );
         if (match) {
-          onCreated(match.id);
+          onCreated(match.id, match);
           return;
         }
       }
@@ -142,7 +146,7 @@ export default function NewChatModal({
         throw created;
       }
       if (created.data) {
-        onCreated(created.data.id);
+        onCreated(created.data.id, created.data);
       } else {
         setError('Could not create the conversation (empty response).');
       }

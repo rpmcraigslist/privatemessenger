@@ -42,6 +42,13 @@ export default function MessageComposer({
     }
   }, [replyTo]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [conversation.id]);
+
   const canSend = (text.trim().length > 0 || file != null) && !sending;
 
   function pickFile(selected: File | null) {
@@ -137,6 +144,7 @@ export default function MessageComposer({
       if (fileInputRef.current) fileInputRef.current.value = '';
       onCancelReply?.();
       onSent?.();
+      window.setTimeout(() => textareaRef.current?.focus(), 0);
     } catch (err) {
       console.error('failed to send message', err);
       setError('Failed to send. Please try again.');

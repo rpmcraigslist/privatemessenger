@@ -7,7 +7,7 @@ import { env } from '$amplify/env/profile-sync';
 import {
   isAdminGroupMember,
   isCognitoUuid,
-  normalizePhoneE164,
+  normalizeContactEmail,
   parseIdentity,
   resolveUsernameFromPool,
 } from '../shared/cognito';
@@ -85,32 +85,23 @@ export const handler: Handler = async (event) => {
     throw new Error('Could not resolve username from Cognito profile');
   }
 
-  const { phoneNumber: phoneArg, smsNotificationsEnabled: smsArg } =
-    event.arguments;
+  const { contactEmail: emailArg } = event.arguments;
   const isAdmin = isAdminGroupMember(event.identity);
   const client = await dataClientPromise;
 
   const existing = await consolidateUserProfiles(client, username, sub);
 
-  let phone = existing?.phoneNumber ?? null;
-  if (phoneArg !== undefined && phoneArg !== null) {
-    const trimmed = phoneArg.trim();
+  let contactEmail = existing?.contactEmail ?? null;
+  if (emailArg !== undefined && emailArg !== null) {
+    const trimmed = emailArg.trim();
     if (!trimmed) {
-      phone = null;
+      contactEmail = null;
     } else {
-      phone = normalizePhoneE164(trimmed);
-      if (!phone) {
-        throw new Error('Enter a valid phone number');
+      contactEmail = normalizeContactEmail(trimmed);
+      if (!contactEmail) {
+        throw new Error('Enter a valid email address');
       }
     }
-  }
-
-  let smsEnabled = existing?.smsNotificationsEnabled ?? false;
-  if (smsArg !== undefined && smsArg !== null) {
-    smsEnabled = smsArg === true;
-  }
-  if (smsEnabled && !phone) {
-    throw new Error('Add a phone number to enable SMS notifications');
   }
 
   if (!existing) {
@@ -120,8 +111,8 @@ export const handler: Handler = async (event) => {
         cognitoSub: sub,
         displayName: username,
         role: isAdmin ? 'admin' : 'user',
-        phoneNumber: phone,
-        smsNotificationsEnabled: smsEnabled,
+        contactEmail,
+        smsNotificationsEnabled: false,
         avatarColor: isAdmin ? '#00a884' : '#64b5f6',
       },
       { authMode: 'iam' },
@@ -133,8 +124,7 @@ export const handler: Handler = async (event) => {
       username,
       cognitoSub: sub,
       role: isAdmin ? 'admin' : 'user',
-      phoneNumber: phone,
-      smsNotificationsEnabled: smsEnabled,
+      contactEmail,
     };
   }
 
@@ -147,8 +137,7 @@ export const handler: Handler = async (event) => {
       username,
       cognitoSub: sub,
       role,
-      phoneNumber: phone,
-      smsNotificationsEnabled: smsEnabled,
+      contactEmail,
     },
     { authMode: 'iam' },
   );
@@ -160,7 +149,6 @@ export const handler: Handler = async (event) => {
     username,
     cognitoSub: sub,
     role,
-    phoneNumber: phone,
-    smsNotificationsEnabled: smsEnabled,
+    contactEmail,
   };
 };

@@ -52,7 +52,7 @@ export default function AuthGate({ children }: Props) {
 
   const [newPassword, setNewPassword] = useState('');
 
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
 
   const [busy, setBusy] = useState(false);
 
@@ -162,7 +162,7 @@ export default function AuthGate({ children }: Props) {
 
           password,
 
-          phoneNumber: phoneNumber.trim() || undefined,
+          contactEmail: contactEmail.trim() || undefined,
 
         },
 
@@ -384,13 +384,11 @@ export default function AuthGate({ children }: Props) {
 
           <NoSaveField
 
-            label="Cell phone (optional, E.164 e.g. +15551234567)"
+            label="Email address (optional)"
 
-            value={phoneNumber}
+            value={contactEmail}
 
-            onChange={setPhoneNumber}
-
-            inputMode="tel"
+            onChange={setContactEmail}
 
           />
 

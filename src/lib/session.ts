@@ -20,14 +20,12 @@ export type SessionUser = {
   username: string;
   cognitoSub: string;
   isAdmin: boolean;
-  phoneNumber: string | null;
-  smsNotificationsEnabled: boolean;
+  contactEmail: string | null;
   profileId: string | null;
 };
 
 export type ProfileUpdate = {
-  phoneNumber: string | null;
-  smsNotificationsEnabled: boolean;
+  contactEmail: string | null;
 };
 
 const LAST_HANDLE_KEY = 'messenger:lastHandle';
@@ -96,13 +94,11 @@ export async function syncMyProfile(
   const resolvedHandle = resolveHandleFromTokens(attrs, session);
 
   const mutationArgs: {
-    phoneNumber?: string;
-    smsNotificationsEnabled?: boolean;
+    contactEmail?: string;
   } = {};
 
   if (update) {
-    mutationArgs.phoneNumber = update.phoneNumber ?? '';
-    mutationArgs.smsNotificationsEnabled = update.smsNotificationsEnabled;
+    mutationArgs.contactEmail = update.contactEmail ?? '';
   }
 
   const { data, errors } = await client.mutations.syncMyProfile(mutationArgs);
@@ -121,8 +117,7 @@ export async function syncMyProfile(
     username,
     cognitoSub: data.cognitoSub,
     isAdmin: data.role === 'admin',
-    phoneNumber: data.phoneNumber ?? null,
-    smsNotificationsEnabled: data.smsNotificationsEnabled,
+    contactEmail: data.contactEmail ?? null,
     profileId: data.profileId,
   };
 }

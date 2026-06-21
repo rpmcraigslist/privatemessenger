@@ -90,7 +90,6 @@ function mapUser(u: UserType) {
     loginId: u.Username ?? '',
     username,
     cognitoSub: attrs.sub ?? null,
-    phoneNumber: attrs.phone_number ?? null,
     status: u.UserStatus ?? 'UNKNOWN',
   };
 }
@@ -261,6 +260,24 @@ async function listUsers() {
   return users;
 }
 
+async function listUsersForAdmin() {
+  const users = await listUsers();
+  const client = await dataClientPromise;
+  const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
+  const emailByHandle = new Map<string, string>();
+  for (const profile of profiles.data) {
+    const email = profile.contactEmail?.trim();
+    if (!email) continue;
+    emailByHandle.set(profile.username.trim().toLowerCase(), email);
+  }
+  return users.map((user) => ({
+    loginId: user.loginId,
+    username: user.username,
+    status: user.status,
+    contactEmail: emailByHandle.get(user.username) ?? null,
+  }));
+}
+
 type AdminEvent = {
   info: { fieldName: string };
   identity: unknown;
@@ -269,7 +286,7 @@ type AdminEvent = {
     usernameA?: string;
     usernameB?: string;
     temporaryPassword?: string;
-    phoneNumber?: string | null;
+    contactEmail?: string | null;
     forcePasswordChange?: boolean | null;
     messageId?: string;
   };
@@ -323,7 +340,7 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
 
   switch (field) {
     case 'adminListUsers':
-      return listUsers();
+      return listUsersForAdmin();
     case 'adminAuditMessenger': {
       const client = await dataClientPromise;
       const users = await listUsers();
@@ -369,7 +386,7 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       );
     }
     case 'adminCreateUser': {
-      const { username, temporaryPassword, phoneNumber, forcePasswordChange } =
+      const { username, temporaryPassword, contactEmail, forcePasswordChange } =
         event.arguments;
       if (!username || !temporaryPassword) {
         throw new Error('username and temporaryPassword are required');
@@ -381,12 +398,6 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         { Name: 'email', Value: loginId },
         { Name: 'email_verified', Value: 'true' },
       ];
-      if (phoneNumber?.trim()) {
-        attrs.push(
-          { Name: 'phone_number', Value: phoneNumber.trim() },
-          { Name: 'phone_number_verified', Value: 'true' },
-        );
-      }
 
       const client = await dataClientPromise;
 
@@ -415,7 +426,7 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       await ensureProfileForCognitoUser(client, {
         username: handle,
         cognitoSub: cognitoUser?.cognitoSub ?? null,
-        phoneNumber,
+        contactEmail: contactEmail?.trim() || null,
       });
 
       return {

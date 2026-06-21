@@ -3,7 +3,6 @@ import { useRef, useState } from 'react';
 import {
   getAlertPrefs,
   getNotificationPermission,
-  isBadgeSupported,
   isNotificationSupported,
   requestNotificationPermission,
   setAlertPrefs,
@@ -11,10 +10,9 @@ import {
 } from '../lib/app-notifications';
 
 import {
-  formatPhoneDisplay,
+  contactEmailError,
   formatUserHandle,
-  normalizePhone,
-  phoneError,
+  normalizeContactEmail,
 } from '../lib/util';
 
 import {
@@ -30,14 +28,8 @@ type Props = {
 };
 
 export default function ProfileSettings({ user, onClose, onSaved }: Props) {
-  const [phoneNumber, setPhoneNumber] = useState(
-    user.phoneNumber ? formatPhoneDisplay(user.phoneNumber) : '',
-  );
-  const [smsEnabled, setSmsEnabled] = useState(user.smsNotificationsEnabled);
+  const [contactEmail, setContactEmail] = useState(user.contactEmail ?? '');
   const [alertPrefs, setAlertPrefsState] = useState(getAlertPrefs);
-  const [showSmsOptions, setShowSmsOptions] = useState(
-    () => user.smsNotificationsEnabled || Boolean(user.phoneNumber),
-  );
   const [notifyError, setNotifyError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,12 +47,6 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
   function handlePanelPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     dismissOnBackdropClick.current = false;
     e.stopPropagation();
-  }
-
-  function formatPhoneInput(raw: string): string | null {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    return normalizePhone(trimmed);
   }
 
   async function toggleBrowserNotifications(enabled: boolean) {
@@ -88,33 +74,20 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const phoneErr = phoneError(phoneNumber);
-      if (phoneErr) {
-        setError(phoneErr);
+      const emailErr = contactEmailError(contactEmail);
+      if (emailErr) {
+        setError(emailErr);
         return;
       }
 
-      const normalized = formatPhoneInput(phoneNumber);
-      if (smsEnabled && !normalized) {
-        setError('Add a phone number to enable SMS notifications.');
-        return;
-      }
-
+      const normalized = normalizeContactEmail(contactEmail);
       const saved = await syncMyProfile({
-        phoneNumber: normalized,
-        smsNotificationsEnabled: smsEnabled,
+        contactEmail: normalized,
       });
 
-      if (saved.phoneNumber) {
-        setPhoneNumber(formatPhoneDisplay(saved.phoneNumber));
-      } else {
-        setPhoneNumber('');
-      }
-      setSmsEnabled(saved.smsNotificationsEnabled);
-
+      setContactEmail(saved.contactEmail ?? '');
       onSaved({
-        phoneNumber: saved.phoneNumber,
-        smsNotificationsEnabled: saved.smsNotificationsEnabled,
+        contactEmail: saved.contactEmail,
       });
       onClose();
     } catch (err) {
@@ -154,13 +127,26 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
         </header>
 
         <form onSubmit={(e) => void save(e)} className="space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-sm text-[var(--color-muted)]">
+              Email address (optional)
+            </span>
+            <input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 outline-none"
+            />
+          </label>
+
           {isNotificationSupported() && (
-            <section className="space-y-3">
+            <section className="space-y-3 border-t border-white/10 pt-4">
               <div>
-                <h3 className="text-sm font-medium">In-app alerts</h3>
+                <h3 className="text-sm font-medium">Message alerts</h3>
                 <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-                  Free — badge on your home-screen icon, pop-up alerts, and
-                  sound. No text messages, no per-message charges.
+                  Optional pop-up alerts and sound while you use the app.
                 </p>
               </div>
 
@@ -172,10 +158,9 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                   className="mt-1"
                 />
                 <span className="text-sm">
-                  <span className="font-medium">App icon badge & alerts</span>
+                  <span className="font-medium">Browser notifications</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
-                    Show unread count on the installed app icon and pop up a
-                    notification when a new message arrives while you are away.
+                    Notify when a new message arrives while you are away.
                     {getNotificationPermission() === 'denied'
                       ? ' Currently blocked in browser settings.'
                       : ''}
@@ -193,79 +178,13 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                 <span className="text-sm">
                   <span className="font-medium">Message sound</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
-                    Play a short chime when a new message arrives in another
-                    chat or while this tab is in the background.
+                    Play a short chime for new messages in another chat or while
+                    this tab is in the background.
                   </span>
                 </span>
               </label>
-
-              {isBadgeSupported() && (
-                <p className="text-xs text-[var(--color-muted)]">
-                  Install this app to your home screen for badge counts on your
-                  phone icon.
-                </p>
-              )}
             </section>
           )}
-
-          <section className="space-y-2 border-t border-white/10 pt-4">
-            {!showSmsOptions ? (
-              <button
-                type="button"
-                onClick={() => setShowSmsOptions(true)}
-                className="text-sm text-[var(--color-muted)] hover:text-white"
-              >
-                Paid text (SMS) alerts — optional, costs money per message
-              </button>
-            ) : (
-              <>
-                <div>
-                  <h3 className="text-sm font-medium text-[var(--color-muted)]">
-                    Paid text (SMS) alerts
-                  </h3>
-                  <p className="mt-0.5 text-xs text-amber-400/90">
-                    Each alert is billed through AWS (~$0.01 per text in the US).
-                    Leave this off and use the free in-app alerts above instead.
-                  </p>
-                </div>
-
-                <label className="block">
-                  <span className="mb-1 block text-sm text-[var(--color-muted)]">
-                    Cell phone (only if you want SMS)
-                  </span>
-                  <input
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    onBlur={() => {
-                      const normalized = formatPhoneInput(phoneNumber);
-                      if (normalized) {
-                        setPhoneNumber(formatPhoneDisplay(normalized));
-                      }
-                    }}
-                    placeholder="8013684783 or (801) 368-4783"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 outline-none"
-                  />
-                </label>
-
-                <label className="flex items-start gap-3 rounded-lg bg-[var(--color-panel-2)] px-3 py-3">
-                  <input
-                    type="checkbox"
-                    checked={smsEnabled}
-                    onChange={(e) => setSmsEnabled(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span className="text-sm">
-                    <span className="font-medium">Send SMS for new messages</span>
-                    <span className="mt-0.5 block text-[var(--color-muted)]">
-                      Charges your AWS account every time a text is sent to you.
-                    </span>
-                  </span>
-                </label>
-              </>
-            )}
-          </section>
 
           {notifyError && <p className="text-sm text-red-400">{notifyError}</p>}
 

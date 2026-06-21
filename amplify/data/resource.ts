@@ -17,6 +17,7 @@ const schema = a
         role: a.enum(['admin', 'user']),
         phoneNumber: a.string(),
         smsNotificationsEnabled: a.boolean(),
+        contactEmail: a.string(),
       })
       .secondaryIndexes((index) => [index('username'), index('cognitoSub')])
       .authorization((allow) => [
@@ -66,7 +67,7 @@ const schema = a
     AdminUser: a.customType({
       loginId: a.string().required(),
       username: a.string().required(),
-      phoneNumber: a.string(),
+      contactEmail: a.string(),
       status: a.string().required(),
     }),
 
@@ -157,8 +158,7 @@ const schema = a
       username: a.string().required(),
       cognitoSub: a.string().required(),
       role: a.string().required(),
-      phoneNumber: a.string(),
-      smsNotificationsEnabled: a.boolean().required(),
+      contactEmail: a.string(),
     }),
 
     DirectoryUser: a.customType({
@@ -180,7 +180,7 @@ const schema = a
       .arguments({
         username: a.string().required(),
         password: a.string().required(),
-        phoneNumber: a.string(),
+        contactEmail: a.string(),
       })
       .returns(a.ref('BootstrapResult'))
       .authorization((allow) => [allow.publicApiKey()])
@@ -203,7 +203,7 @@ const schema = a
       .arguments({
         username: a.string().required(),
         temporaryPassword: a.string().required(),
-        phoneNumber: a.string(),
+        contactEmail: a.string(),
         forcePasswordChange: a.boolean(),
       })
       .returns(a.ref('AdminCreateUserResult'))
@@ -281,8 +281,7 @@ const schema = a
     syncMyProfile: a
       .mutation()
       .arguments({
-        phoneNumber: a.string(),
-        smsNotificationsEnabled: a.boolean(),
+        contactEmail: a.string(),
       })
       .returns(a.ref('SyncProfileResult'))
       .authorization((allow) => [allow.authenticated()])

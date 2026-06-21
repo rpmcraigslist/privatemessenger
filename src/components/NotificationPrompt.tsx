@@ -47,10 +47,9 @@ export default function NotificationPrompt({ onEnabled }: Props) {
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-3 sm:p-4">
       <div className="pointer-events-auto flex w-full max-w-md flex-col gap-3 rounded-2xl border border-white/10 bg-[var(--color-panel)] p-4 shadow-2xl sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
-          <p className="font-medium">Free message alerts</p>
+          <p className="font-medium">Message alerts</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Badge count on your app icon, sound, and pop-up notifications — no
-            text messages, no SMS charges.
+            Pop-up alerts and sound when new messages arrive.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">

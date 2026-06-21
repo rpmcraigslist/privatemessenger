@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { client } from '../lib/amplify';
 import {
+  contactEmailError,
   formatUserHandle,
-  normalizePhone,
+  normalizeContactEmail,
   normalizeUsername,
-  phoneError,
   usernameError,
 } from '../lib/util';
 import { NoSaveField, NoSaveForm } from './NoSaveCredentials';
@@ -12,7 +12,7 @@ import { NoSaveField, NoSaveForm } from './NoSaveCredentials';
 type AdminUser = {
   loginId: string;
   username: string;
-  phoneNumber?: string | null;
+  contactEmail?: string | null;
   status: string;
 };
 
@@ -51,7 +51,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
 
   const [newUsername, setNewUsername] = useState('');
   const [tempPassword, setTempPassword] = useState('');
-  const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [forceChange, setForceChange] = useState(true);
   const [purgeUserA, setPurgeUserA] = useState('paul');
   const [purgeUserB, setPurgeUserB] = useState('lena');
@@ -104,19 +104,19 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       setError('Enter a temporary password.');
       return;
     }
-    const phoneErr = phoneError(newPhone);
-    if (phoneErr) {
-      setError(phoneErr);
+    const emailErr = contactEmailError(newEmail);
+    if (emailErr) {
+      setError(emailErr);
       return;
     }
-    const phone = normalizePhone(newPhone);
+    const email = normalizeContactEmail(newEmail);
 
     setBusy(true);
     try {
       const { data, errors } = await client.mutations.adminCreateUser({
         username: handle,
         temporaryPassword: tempPassword,
-        phoneNumber: phone ?? undefined,
+        contactEmail: email ?? undefined,
         forcePasswordChange: forceChange,
       });
       if (errors?.length) throw new Error(errors[0].message);
@@ -128,7 +128,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       );
       setNewUsername('');
       setTempPassword('');
-      setNewPhone('');
+      setNewEmail('');
       await loadUsers();
       await loadAudit();
     } catch (err) {
@@ -442,10 +442,11 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
                 className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
               />
               <input
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="Cell phone (optional, +15551234567)"
-                autoComplete="off"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="Email address (optional)"
+                autoComplete="email"
                 className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
               />
               <label className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
@@ -485,7 +486,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
                           {u.status === 'FORCE_CHANGE_PASSWORD'
                             ? 'Must change password on login'
                             : u.status}
-                          {u.phoneNumber ? ` · ${u.phoneNumber}` : ''}
+                          {u.contactEmail ? ` · ${u.contactEmail}` : ''}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">

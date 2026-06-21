@@ -172,6 +172,21 @@ export function phoneError(value: string): string | null {
   return 'Could not read that phone number. Try 10 digits or include country code.';
 }
 
+/** Normalize optional contact email. Returns null if empty or invalid. */
+export function normalizeContactEmail(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (trimmed.endsWith(LOGIN_DOMAIN)) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+export function contactEmailError(value: string): string | null {
+  if (!value.trim()) return null;
+  if (normalizeContactEmail(value)) return null;
+  return 'Enter a valid email address (not your messenger login id).';
+}
+
 export function mapAuthError(err: unknown): string {
   const name =
     typeof err === 'object' && err && 'name' in err

@@ -91,7 +91,7 @@ export async function consolidateUserProfiles(
 export type CognitoUserLink = {
   username: string;
   cognitoSub: string | null;
-  phoneNumber?: string | null;
+  contactEmail?: string | null;
 };
 
 /**
@@ -122,7 +122,7 @@ export async function ensureProfileForCognitoUser(
         username: handle,
         cognitoSub: user.cognitoSub ?? keeper.cognitoSub,
         displayName,
-        phoneNumber: user.phoneNumber?.trim() || keeper.phoneNumber,
+        contactEmail: user.contactEmail?.trim() || keeper.contactEmail,
       },
       { authMode: 'iam' },
     );
@@ -146,7 +146,7 @@ export async function ensureProfileForCognitoUser(
       cognitoSub: user.cognitoSub,
       displayName: handle,
       role: 'user',
-      phoneNumber: user.phoneNumber?.trim() || null,
+      contactEmail: user.contactEmail?.trim() || null,
       avatarColor: '#64b5f6',
     },
     { authMode: 'iam' },

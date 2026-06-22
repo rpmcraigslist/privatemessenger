@@ -9,6 +9,7 @@ import {
 } from 'aws-amplify/auth';
 import { client } from './amplify';
 import { sessionUserFromSyncProfile } from './api-contract';
+import { resetReadStateSync } from './read-state-sync';
 import {
   isCognitoUuid,
   normalizeUsername,
@@ -171,6 +172,7 @@ export async function completeNewPassword(newPassword: string) {
 
 export async function signOutAndClear(): Promise<void> {
   clearRememberedSignInHandle();
+  resetReadStateSync();
   await signOut();
 }
 

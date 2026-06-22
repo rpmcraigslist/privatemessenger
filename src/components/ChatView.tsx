@@ -6,6 +6,7 @@ import {
   findLastUnreadMessage,
   getLastReadAt,
   markConversationReadThrough,
+  resolveReadScopeKey,
 } from '../lib/read-state';
 
 import {
@@ -189,6 +190,17 @@ export default function ChatView({
 
   const latestMessagesRef = useRef<MessageModel[]>([]);
 
+  const readScopeKey = useMemo(
+    () =>
+      resolveReadScopeKey(
+        conversation,
+        myUsername,
+        mySub,
+        handleToSub,
+      ),
+    [conversation, handleToSub, mySub, myUsername],
+  );
+
   const markVisibleMessagesRead = useCallback(
     (items: MessageModel[]) => {
       latestMessagesRef.current = items;
@@ -196,14 +208,15 @@ export default function ChatView({
         markConversationReadThrough(
           mySub,
           myUsername,
-          conversation.id,
+          readScopeKey,
           items,
+          conversation.id,
         )
       ) {
         onConversationUpdatedRef.current();
       }
     },
-    [conversation.id, mySub, myUsername],
+    [conversation.id, mySub, myUsername, readScopeKey],
   );
 
   const title = conversationTitle(
@@ -514,7 +527,12 @@ export default function ChatView({
 
     if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
 
-    const lastReadAt = getLastReadAt(mySub, myUsername, conversation.id);
+    const lastReadAt = getLastReadAt(
+      mySub,
+      myUsername,
+      readScopeKey,
+      conversation.id,
+    );
 
     const lastUnread = findLastUnreadMessage(
 
@@ -527,6 +545,8 @@ export default function ChatView({
       mySub,
 
       subToUsername,
+
+      handleToSub,
 
     );
 
@@ -577,6 +597,10 @@ export default function ChatView({
     myUsername,
 
     pinToBottom,
+
+    readScopeKey,
+
+    handleToSub,
 
     scrollToMessage,
 

@@ -24,6 +24,12 @@ import { loadUserDirectory } from '../lib/directory';
 
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
 
+import {
+  markConversationReadAt,
+  resolveReadScopeKey,
+} from '../lib/read-state';
+import { loadServerReadState } from '../lib/read-state-sync';
+
 import { computeUnreadCounts, totalUnreadCount } from '../lib/unread-counts';
 
 import {
@@ -295,6 +301,8 @@ export default function Messenger({ onSignOut }: Props) {
   const loadAccount = useCallback(async () => {
 
     const sessionUser = await resolveCurrentUser();
+
+    await loadServerReadState(sessionUser.cognitoSub);
 
     setUser(sessionUser);
 
@@ -712,6 +720,8 @@ export default function Messenger({ onSignOut }: Props) {
 
       subToUsername,
 
+      handleToSub,
+
     );
 
   }, [
@@ -719,6 +729,8 @@ export default function Messenger({ onSignOut }: Props) {
     allMessages,
 
     conversations,
+
+    handleToSub,
 
     readRevision,
 
@@ -737,6 +749,86 @@ export default function Messenger({ onSignOut }: Props) {
     setReadRevision((revision) => revision + 1);
 
   }, []);
+
+
+
+  const markConversationOpened = useCallback(
+
+    (conversation: ConversationModel) => {
+
+      if (!user) return false;
+
+      const readAt =
+
+        latestByConversation.get(conversation.id)?.at ??
+
+        conversation.lastMessageAt ??
+
+        conversation.updatedAt ??
+
+        conversation.createdAt;
+
+      if (!readAt) return false;
+
+      const readScopeKey = resolveReadScopeKey(
+
+        conversation,
+
+        user.username,
+
+        user.cognitoSub,
+
+        handleToSub,
+
+      );
+
+      return markConversationReadAt(
+
+        user.cognitoSub,
+
+        user.username,
+
+        readScopeKey,
+
+        readAt,
+
+        conversation.id,
+
+      );
+
+    },
+
+    [handleToSub, latestByConversation, user],
+
+  );
+
+
+
+  const handleSelectConversation = useCallback(
+
+    (conversationId: string) => {
+
+      setSelectedId(conversationId);
+
+      const conversation = mergedConversations.find(
+
+        (item) => item.id === conversationId,
+
+      );
+
+      if (!conversation) return;
+
+      if (markConversationOpened(conversation)) {
+
+        handleConversationUpdated();
+
+      }
+
+    },
+
+    [handleConversationUpdated, markConversationOpened, mergedConversations],
+
+  );
 
 
 
@@ -848,7 +940,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     setNotificationClickHandler((conversationId) => {
 
-      setSelectedId(conversationId);
+      handleSelectConversation(conversationId);
 
     });
 
@@ -860,7 +952,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     };
 
-  }, []);
+  }, [handleSelectConversation]);
 
 
 
@@ -1038,7 +1130,7 @@ export default function Messenger({ onSignOut }: Props) {
 
           unreadCounts={unreadCounts}
 
-          onSelect={setSelectedId}
+          onSelect={handleSelectConversation}
 
           onNewChat={() => setShowNewChat(true)}
 

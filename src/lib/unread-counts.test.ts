@@ -1,7 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConversationModel, MessageModel } from './amplify';
-import { markConversationRead } from './read-state';
+import { markConversationRead, resolveReadScopeKey } from './read-state';
 import { computeUnreadCounts, totalUnreadCount } from './unread-counts';
+
+vi.mock('./read-state-sync', () => ({
+  getServerLastReadAt: () => null,
+  mergeServerLastReadAt: vi.fn(),
+  loadServerReadState: vi.fn(),
+  resetReadStateSync: vi.fn(),
+}));
 
 function conversation(id: string): ConversationModel {
   return {
@@ -30,6 +37,8 @@ function message(
 }
 
 describe('unread-counts', () => {
+  const handleToSub = new Map<string, string>();
+
   beforeEach(() => {
     localStorage.clear();
   });
@@ -45,6 +54,7 @@ describe('unread-counts', () => {
       'me',
       'my-sub',
       new Map(),
+      handleToSub,
     );
 
     expect(counts.get('c1')).toBe(0);
@@ -52,15 +62,18 @@ describe('unread-counts', () => {
   });
 
   it('updates after a conversation is marked read', () => {
-    markConversationRead('my-sub', 'me', 'c2', '2026-06-20T11:00:00.000Z');
+    const conv = conversation('c2');
+    const scope = resolveReadScopeKey(conv, 'me', 'my-sub', handleToSub);
+    markConversationRead('my-sub', 'me', scope, '2026-06-20T11:00:00.000Z', 'c2');
 
     const counts = computeUnreadCounts(
-      [conversation('c2')],
+      [conv],
       [message('m2', 'c2', 'other', '2026-06-20T11:00:00.000Z')],
       null,
       'me',
       'my-sub',
       new Map(),
+      handleToSub,
     );
 
     expect(counts.get('c2')).toBe(0);
@@ -79,6 +92,7 @@ describe('unread-counts', () => {
       'me',
       'my-sub',
       new Map(),
+      handleToSub,
     );
 
     expect(totalUnreadCount(counts)).toBe(3);

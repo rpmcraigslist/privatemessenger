@@ -1,48 +1,109 @@
 import { client, type MessageModel } from './amplify';
-import { isSameMessengerUser } from './util';
+import {
+  getServerLastReadAt,
+  mergeServerLastReadAt,
+} from './read-state-sync';
+import {
+  directConversationPeerKey,
+  isMessageFromSelf,
+  type ConversationLike,
+} from './util';
 
 const PREFIX = 'messenger:read:';
+
+export function maxIsoTimestamp(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): string | null {
+  if (!left) return right ?? null;
+  if (!right) return left;
+  const leftMs = new Date(left).getTime();
+  const rightMs = new Date(right).getTime();
+  if (Number.isNaN(leftMs)) return right;
+  if (Number.isNaN(rightMs)) return left;
+  return leftMs >= rightMs ? left : right;
+}
+
+/** Stable key for read cursors: peer pair for 1:1, conversation id for groups. */
+export function resolveReadScopeKey(
+  conversation: ConversationLike,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string {
+  const peerKey = directConversationPeerKey(
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  if (peerKey) return `peer:${peerKey}`;
+  return `conv:${conversation.id}`;
+}
 
 function storageKeys(
   sub: string,
   username: string,
-  conversationId: string,
+  readScopeKey: string,
+  conversationId?: string,
 ): string[] {
   const handle = username.trim().toLowerCase();
-  return [
-    `${PREFIX}${sub}:${conversationId}`,
-    `${PREFIX}user:${handle}:${conversationId}`,
-  ];
+  const keys = new Set<string>([
+    `${PREFIX}${sub}:${readScopeKey}`,
+    `${PREFIX}user:${handle}:${readScopeKey}`,
+  ]);
+
+  if (conversationId) {
+    keys.add(`${PREFIX}${sub}:${conversationId}`);
+    keys.add(`${PREFIX}user:${handle}:${conversationId}`);
+  }
+
+  return [...keys];
+}
+
+function readLocalLastReadAt(
+  sub: string,
+  username: string,
+  readScopeKey: string,
+  conversationId?: string,
+): string | null {
+  let latest: string | null = null;
+  for (const key of storageKeys(sub, username, readScopeKey, conversationId)) {
+    const value = localStorage.getItem(key);
+    if (!value) continue;
+    latest = maxIsoTimestamp(latest, value);
+  }
+  return latest;
 }
 
 export function getLastReadAt(
   sub: string,
   username: string,
-  conversationId: string,
+  readScopeKey: string,
+  conversationId?: string,
 ): string | null {
-  let latest: string | null = null;
-  for (const key of storageKeys(sub, username, conversationId)) {
-    const value = localStorage.getItem(key);
-    if (!value) continue;
-    if (
-      !latest ||
-      new Date(value).getTime() > new Date(latest).getTime()
-    ) {
-      latest = value;
-    }
-  }
-  return latest;
+  const local = readLocalLastReadAt(sub, username, readScopeKey, conversationId);
+  const server = getServerLastReadAt(sub, readScopeKey);
+  return maxIsoTimestamp(local, server);
 }
 
 export function markConversationRead(
   sub: string,
   username: string,
-  conversationId: string,
+  readScopeKey: string,
   readAtIso: string,
-): void {
-  for (const key of storageKeys(sub, username, conversationId)) {
-    localStorage.setItem(key, readAtIso);
+  conversationId?: string,
+): boolean {
+  const previous = getLastReadAt(sub, username, readScopeKey, conversationId);
+  const merged = maxIsoTimestamp(previous, readAtIso);
+  if (!merged || merged === previous) return false;
+
+  for (const key of storageKeys(sub, username, readScopeKey, conversationId)) {
+    localStorage.setItem(key, merged);
   }
+
+  mergeServerLastReadAt(sub, readScopeKey, merged);
+  return true;
 }
 
 /** True when lastReadAt covers messageCreatedAt (timestamp-safe). */
@@ -64,12 +125,7 @@ export function latestMessageTimestamp(
   for (const message of messages) {
     const createdAt = message.createdAt;
     if (!createdAt) continue;
-    if (
-      !latest ||
-      new Date(createdAt).getTime() > new Date(latest).getTime()
-    ) {
-      latest = createdAt;
-    }
+    latest = maxIsoTimestamp(latest, createdAt);
   }
   return latest;
 }
@@ -78,17 +134,29 @@ export function latestMessageTimestamp(
 export function markConversationReadThrough(
   sub: string,
   username: string,
-  conversationId: string,
+  readScopeKey: string,
   messages: readonly { createdAt?: string | null }[],
+  conversationId?: string,
 ): boolean {
   const latest = latestMessageTimestamp(messages);
   if (!latest) return false;
 
-  const previous = getLastReadAt(sub, username, conversationId);
+  const previous = getLastReadAt(sub, username, readScopeKey, conversationId);
   if (isReadThrough(previous, latest)) return false;
 
-  markConversationRead(sub, username, conversationId, latest);
-  return true;
+  return markConversationRead(sub, username, readScopeKey, latest, conversationId);
+}
+
+/** Mark read through a known timestamp (e.g. conversation.lastMessageAt). */
+export function markConversationReadAt(
+  sub: string,
+  username: string,
+  readScopeKey: string,
+  readAtIso: string,
+  conversationId?: string,
+): boolean {
+  if (!readAtIso) return false;
+  return markConversationRead(sub, username, readScopeKey, readAtIso, conversationId);
 }
 
 export function countUnreadMessages(
@@ -97,14 +165,20 @@ export function countUnreadMessages(
   myUsername: string,
   mySub: string,
   subToUsername: Map<string, string>,
+  handleToSub: Map<string, string>,
 ): number {
   return messages.filter((message) => {
     if (
-      isSameMessengerUser(
+      isMessageFromSelf(
         message.senderUsername,
         myUsername,
         mySub,
         subToUsername,
+        handleToSub,
+        {
+          isGroup: (message.participantUsernames?.length ?? 0) > 2,
+          participants: message.participantUsernames ?? [],
+        },
       )
     ) {
       return false;
@@ -121,15 +195,21 @@ export function findLastUnreadMessage(
   myUsername: string,
   mySub: string,
   subToUsername: Map<string, string>,
+  handleToSub: Map<string, string>,
 ): MessageModel | null {
   let lastUnread: MessageModel | null = null;
   for (const message of messages) {
     if (
-      isSameMessengerUser(
+      isMessageFromSelf(
         message.senderUsername,
         myUsername,
         mySub,
         subToUsername,
+        handleToSub,
+        {
+          isGroup: (message.participantUsernames?.length ?? 0) > 2,
+          participants: message.participantUsernames ?? [],
+        },
       )
     ) {
       continue;
@@ -149,6 +229,7 @@ export async function fetchUnreadCount(
   myUsername: string,
   mySub: string,
   subToUsername: Map<string, string>,
+  handleToSub: Map<string, string>,
 ): Promise<number> {
   const { data, errors } = await client.models.Message.list({
     filter: { conversationId: { eq: conversationId } },
@@ -160,6 +241,7 @@ export async function fetchUnreadCount(
     myUsername,
     mySub,
     subToUsername,
+    handleToSub,
   );
 }
 
@@ -168,5 +250,5 @@ export function readCursorForMessages(
   lastReadAt: string | null,
   messages: { createdAt?: string | null }[],
 ): string | null {
-  return latestMessageTimestamp(messages) ?? lastReadAt;
+  return maxIsoTimestamp(lastReadAt, latestMessageTimestamp(messages));
 }

@@ -494,6 +494,20 @@ export async function purgeUserMessengerData(
     deletedMessages++;
   }
 
+  if (identity.sub) {
+    const readStates = await client.models.ConversationReadState.list({
+      filter: { userSub: { eq: identity.sub } },
+      authMode: 'iam',
+    });
+    for (const row of readStates.data ?? []) {
+      if (!row.userSub || !row.readScopeKey) continue;
+      await client.models.ConversationReadState.delete(
+        { userSub: row.userSub, readScopeKey: row.readScopeKey },
+        { authMode: 'iam' },
+      );
+    }
+  }
+
   return {
     deletedMessages,
     deletedConversations,

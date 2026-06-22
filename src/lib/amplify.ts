@@ -37,3 +37,5 @@ export const client = generateClient<Schema>({
 export type ConversationModel = Schema['Conversation']['type'];
 export type MessageModel = Schema['Message']['type'];
 export type UserProfileModel = Schema['UserProfile']['type'];
+export type ConversationReadStateModel =
+  Schema['ConversationReadState']['type'];

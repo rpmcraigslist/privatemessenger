@@ -9,6 +9,7 @@ import { bootstrapAdmin } from './functions/bootstrap-admin/resource';
 import { adminOps } from './functions/admin-ops/resource';
 import { messageAlerts } from './functions/message-alerts/resource';
 import { profileSync } from './functions/profile-sync/resource';
+import { readCursor } from './functions/read-cursor/resource';
 
 const backend = defineBackend({
   auth,
@@ -20,6 +21,7 @@ const backend = defineBackend({
   adminOps,
   messageAlerts,
   profileSync,
+  readCursor,
 });
 
 const userPool = backend.auth.resources.userPool;

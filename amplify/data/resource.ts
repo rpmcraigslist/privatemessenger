@@ -5,6 +5,7 @@ import { bootstrapAdmin } from '../functions/bootstrap-admin/resource';
 import { adminOps } from '../functions/admin-ops/resource';
 import { messageAlerts } from '../functions/message-alerts/resource';
 import { profileSync } from '../functions/profile-sync/resource';
+import { readCursor } from '../functions/read-cursor/resource';
 
 const schema = a
   .schema({
@@ -63,6 +64,23 @@ const schema = a
           .identityClaim('sub')
           .to(['read', 'create']),
       ]),
+
+    ConversationReadState: a
+      .model({
+        userSub: a.string().required(),
+        readScopeKey: a.string().required(),
+        lastReadAt: a.datetime().required(),
+        conversationId: a.id(),
+      })
+      .identifier(['userSub', 'readScopeKey'])
+      .secondaryIndexes((index) => [index('userSub')])
+      .authorization(() => []),
+
+    ReadCursorRow: a.customType({
+      readScopeKey: a.string().required(),
+      lastReadAt: a.string().required(),
+      conversationId: a.string(),
+    }),
 
     AdminUser: a.customType({
       loginId: a.string().required(),
@@ -287,6 +305,23 @@ const schema = a
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(profileSync)),
 
+    listMyReadCursors: a
+      .query()
+      .returns(a.ref('ReadCursorRow').array())
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(readCursor)),
+
+    upsertMyReadCursor: a
+      .mutation()
+      .arguments({
+        readScopeKey: a.string().required(),
+        lastReadAt: a.string().required(),
+        conversationId: a.string(),
+      })
+      .returns(a.ref('ReadCursorRow'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(readCursor)),
+
     getAttachmentUrl: a
       .query()
       .arguments({
@@ -304,6 +339,7 @@ const schema = a
     allow.resource(adminOps),
     allow.resource(messageAlerts),
     allow.resource(profileSync),
+    allow.resource(readCursor),
   ]);
 
 export type Schema = ClientSchema<typeof schema>;

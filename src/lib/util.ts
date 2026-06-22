@@ -317,7 +317,7 @@ export function repairParticipantSubs(
   return [...new Set(mapped)];
 }
 
-type ConversationLike = {
+export type ConversationLike = {
   id: string;
   isGroup?: boolean | null;
   participants: (string | null)[];

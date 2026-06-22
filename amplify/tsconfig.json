@@ -8,9 +8,16 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
+    "noEmit": true,
     "paths": {
       "$amplify/*": ["../.amplify/generated/*"],
-      "$amplify/env/attachment-url": ["../amplify/env-stubs/attachment-url"]
+      "$amplify/env/admin-ops": ["./env-stubs/function-env"],
+      "$amplify/env/attachment-url": ["./env-stubs/function-env"],
+      "$amplify/env/bootstrap-admin": ["./env-stubs/function-env"],
+      "$amplify/env/message-alerts": ["./env-stubs/function-env"],
+      "$amplify/env/profile-sync": ["./env-stubs/function-env"]
     }
-  }
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["./node_modules"]
 }

@@ -485,7 +485,7 @@ export async function purgeUserMessengerData(
   }
 
   const orphanMessages = [
-    ...messagesByConversation.values().flat(),
+    ...[...messagesByConversation.values()].flat(),
     ...messages.filter((message) => !message.conversationId),
   ];
   for (const message of orphanMessages) {

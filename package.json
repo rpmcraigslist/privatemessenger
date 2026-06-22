@@ -12,6 +12,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
+    "typecheck:backend": "tsc -p amplify/tsconfig.json --noEmit",
+    "verify": "npm run typecheck && npm run typecheck:backend && npm run test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "sandbox": "ampx sandbox",

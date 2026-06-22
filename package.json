@@ -1,7 +1,7 @@
 {
   "name": "private-messenger",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Real-time, mobile-first messenger PWA on AWS (Cognito + AppSync + DynamoDB + S3) using Amplify Gen 2.",
   "engines": {
@@ -29,6 +29,7 @@
     "@aws-amplify/ui-react": "^6.15.4",
     "@aws-sdk/client-cognito-identity-provider": "^3.1071.0",
     "@aws-sdk/client-s3": "^3.1069.0",
+    "@aws-sdk/client-ses": "^3.1071.0",
     "@aws-sdk/client-sns": "^3.1071.0",
     "@aws-sdk/s3-request-presigner": "^3.1069.0",
     "aws-amplify": "^6.18.0",

@@ -26,6 +26,8 @@ import { resolveCurrentUser, type SessionUser } from '../lib/session';
 
 import { loadServerReadState, installReadStateFlushHooks } from '../lib/read-state-sync';
 
+import { consumePendingDeepLink } from '../lib/deep-link';
+
 import { computeUnreadCounts, totalUnreadCount } from '../lib/unread-counts';
 
 import {
@@ -126,6 +128,8 @@ export default function Messenger({ onSignOut }: Props) {
   const [conversations, setConversations] = useState<ConversationModel[]>([]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const [focusMessageId, setFocusMessageId] = useState<string | null>(null);
 
   const [showNewChat, setShowNewChat] = useState(false);
 
@@ -367,6 +371,22 @@ export default function Messenger({ onSignOut }: Props) {
     if (!user) return;
 
     return installReadStateFlushHooks();
+
+  }, [user?.cognitoSub]);
+
+
+
+  useEffect(() => {
+
+    if (!user) return;
+
+    const pending = consumePendingDeepLink();
+
+    if (!pending) return;
+
+    setSelectedId(pending.conversationId);
+
+    setFocusMessageId(pending.messageId ?? null);
 
   }, [user?.cognitoSub]);
 
@@ -1141,6 +1161,10 @@ export default function Messenger({ onSignOut }: Props) {
             onMessageCreated={handleMessageCreated}
 
             onMessageDeleted={handleMessageDeleted}
+
+            focusMessageId={focusMessageId}
+
+            onFocusMessageHandled={() => setFocusMessageId(null)}
 
           />
 

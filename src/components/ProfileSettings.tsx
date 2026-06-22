@@ -141,6 +141,10 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
             onChange={setContactEmail}
             placeholder="you@example.com"
           />
+          <p className="text-xs text-[var(--color-muted)]">
+            When saved, new messages can email you &quot;You&apos;ve got a new
+            message&quot; with a link to sign in and open the conversation.
+          </p>
 
           {isNotificationSupported() && (
             <section className="space-y-3 border-t border-white/10 pt-4">

@@ -66,11 +66,26 @@ backend.attachmentUrl.addEnvironment(
 );
 
 backend.messageAlerts.addEnvironment('USER_POOL_ID', poolId);
+backend.messageAlerts.addEnvironment(
+  'MESSENGER_FROM_EMAIL',
+  process.env.MESSENGER_FROM_EMAIL ?? '',
+);
+backend.messageAlerts.addEnvironment(
+  'MESSENGER_APP_URL',
+  process.env.MESSENGER_APP_URL ?? '',
+);
 userPool.grant(backend.messageAlerts.resources.lambda, 'cognito-idp:ListUsers');
 
 backend.messageAlerts.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['sns:Publish'],
+    resources: ['*'],
+  }),
+);
+
+backend.messageAlerts.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
     resources: ['*'],
   }),
 );

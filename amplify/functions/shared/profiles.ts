@@ -82,3 +82,14 @@ export function profileSmsTarget(
   if (!phone) return null;
   return { phone };
 }
+
+/** Real-world email saved on profile for new-message alerts. */
+export function profileEmailTarget(
+  profile: UserProfile | null | undefined,
+): { email: string } | null {
+  if (!profile) return null;
+  const email = profile.contactEmail?.trim();
+  if (!email) return null;
+  if (email.toLowerCase().endsWith('@messenger.local')) return null;
+  return { email };
+}

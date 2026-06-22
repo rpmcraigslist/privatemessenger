@@ -71,6 +71,11 @@ type Props = {
 
   onMessageDeleted?: (messageId: string) => void;
 
+  /** Scroll to this message once when opening from an email/deep link. */
+  focusMessageId?: string | null;
+
+  onFocusMessageHandled?: () => void;
+
 };
 
 
@@ -120,6 +125,10 @@ export default function ChatView({
   onMessageCreated,
 
   onMessageDeleted,
+
+  focusMessageId,
+
+  onFocusMessageHandled,
 
 }: Props) {
 
@@ -553,27 +562,12 @@ export default function ChatView({
 
     if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
 
-    const lastReadAt = getLastReadAt(
-      mySub,
-      myUsername,
-      readScopeKey,
-      conversation.id,
-    );
-    const firstUnread = findFirstUnreadMessage(
-      messages,
-      lastReadAt,
-      myUsername,
-      mySub,
-      subToUsername,
-      handleToSub,
-    );
-
     let positioned = false;
 
-    if (firstUnread?.id) {
-      positioned = scrollToMessage(firstUnread.id, {
-        flash: false,
-        block: 'start',
+    if (focusMessageId) {
+      positioned = scrollToMessage(focusMessageId, {
+        flash: true,
+        block: 'center',
         behavior: 'instant',
       });
       if (positioned) {
@@ -581,7 +575,35 @@ export default function ChatView({
       }
     }
 
-    if (!firstUnread || !positioned) {
+    if (!positioned) {
+      const lastReadAt = getLastReadAt(
+        mySub,
+        myUsername,
+        readScopeKey,
+        conversation.id,
+      );
+      const firstUnread = findFirstUnreadMessage(
+        messages,
+        lastReadAt,
+        myUsername,
+        mySub,
+        subToUsername,
+        handleToSub,
+      );
+
+      if (firstUnread?.id) {
+        positioned = scrollToMessage(firstUnread.id, {
+          flash: false,
+          block: 'start',
+          behavior: 'instant',
+        });
+        if (positioned) {
+          stickToBottomRef.current = false;
+        }
+      }
+    }
+
+    if (!positioned) {
       stickToBottomRef.current = true;
       pinToBottom(true);
       positioned = true;
@@ -591,11 +613,16 @@ export default function ChatView({
 
     if (positioned) {
       entryScrollDoneRef.current = true;
+      if (focusMessageId) {
+        onFocusMessageHandled?.();
+      }
     }
 
   }, [
 
     conversation.id,
+
+    focusMessageId,
 
     handleToSub,
 
@@ -608,6 +635,8 @@ export default function ChatView({
     mySub,
 
     myUsername,
+
+    onFocusMessageHandled,
 
     pinToBottom,
 

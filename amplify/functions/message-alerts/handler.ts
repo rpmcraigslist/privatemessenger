@@ -1,4 +1,5 @@
 import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';
+import { SendEmailCommand, SESClient } from '@aws-sdk/client-ses';
 import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtime';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
@@ -6,8 +7,14 @@ import type { Schema } from '../../data/resource';
 import { env } from '$amplify/env/message-alerts';
 import { isCognitoUuid, resolveCallerIdentity } from '../shared/cognito';
 import {
+  buildMessageAlertEmail,
+  buildMessengerDeepLink,
+  resolveMessengerAppUrl,
+} from '../shared/message-alert-content';
+import {
   findProfileForParticipant,
   isParticipantSender,
+  profileEmailTarget,
   profileSmsTarget,
 } from '../shared/profiles';
 
@@ -16,6 +23,7 @@ type DataClient = ReturnType<typeof generateClient<Schema>>;
 type MessageModel = Schema['Message']['type'];
 
 const sns = new SNSClient({});
+const ses = new SESClient({});
 const dataClientPromise = getAmplifyDataClientConfig(
   env as Parameters<typeof getAmplifyDataClientConfig>[0],
 ).then(({ resourceConfig, libraryOptions }) => {
@@ -32,12 +40,9 @@ function smsSenderLabel(
   return candidate;
 }
 
-function loginUrl(appUrl?: string | null): string {
-  const fromArg = appUrl?.trim();
-  if (fromArg) return fromArg.replace(/\/$/, '');
-  const fromEnv = process.env.MESSENGER_APP_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
-  return 'https://example.com';
+function fromEmailAddress(): string | null {
+  const value = process.env.MESSENGER_FROM_EMAIL?.trim();
+  return value || null;
 }
 
 async function loadMessage(
@@ -55,6 +60,32 @@ async function loadMessage(
   return null;
 }
 
+async function sendEmailAlert(
+  toAddress: string,
+  openUrl: string,
+): Promise<void> {
+  const from = fromEmailAddress();
+  if (!from) {
+    throw new Error('MESSENGER_FROM_EMAIL is not configured');
+  }
+
+  const { subject, textBody, htmlBody } = buildMessageAlertEmail({ openUrl });
+
+  await ses.send(
+    new SendEmailCommand({
+      Source: from,
+      Destination: { ToAddresses: [toAddress] },
+      Message: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: {
+          Text: { Data: textBody, Charset: 'UTF-8' },
+          Html: { Data: htmlBody, Charset: 'UTF-8' },
+        },
+      },
+    }),
+  );
+}
+
 export const handler: Handler = async (event) => {
   const { messageId, appUrl } = event.arguments;
   const { sub: callerSub, username: callerUsername } =
@@ -65,19 +96,21 @@ export const handler: Handler = async (event) => {
 
   const client = await dataClientPromise;
   const message = await loadMessage(client, messageId);
-  if (!message) {
+  if (!message?.conversationId) {
     console.warn('sendMessageAlerts: message not found', messageId);
     return { sent: 0, failed: 0, skipped: 0 };
   }
 
-  const { senderUsername, participantUsernames } = message;
+  const { senderUsername, participantUsernames, conversationId } = message;
   const senderName = smsSenderLabel(callerUsername, senderUsername);
-  const url = loginUrl(appUrl);
-  const smsBody = `New message received from ${senderName}, click ${url} to see message`;
+  const baseUrl = resolveMessengerAppUrl(appUrl);
+  const openUrl = buildMessengerDeepLink(baseUrl, conversationId, messageId);
+  const smsBody = `You've got a new message from ${senderName}. Open: ${openUrl}`;
 
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  const fromEmail = fromEmailAddress();
 
   for (const participantId of participantUsernames ?? []) {
     if (!participantId) continue;
@@ -86,12 +119,42 @@ export const handler: Handler = async (event) => {
     }
 
     const profile = await findProfileForParticipant(client, participantId);
-    const target = profileSmsTarget(profile);
-    if (!target) {
+    const emailTarget = profileEmailTarget(profile);
+    const smsTarget = profileSmsTarget(profile);
+
+    if (emailTarget && fromEmail) {
+      try {
+        await sendEmailAlert(emailTarget.email, openUrl);
+        sent++;
+        console.info('sendMessageAlerts: email sent', {
+          participantId,
+          email: emailTarget.email.replace(/(^.).*(@.*$)/, '$1***$2'),
+        });
+      } catch (err) {
+        failed++;
+        console.error('sendMessageAlerts: email failed', {
+          participantId,
+          email: emailTarget.email,
+          err,
+        });
+      }
+      continue;
+    }
+
+    if (emailTarget && !fromEmail) {
+      skipped++;
+      console.info('sendMessageAlerts: email skipped (no MESSENGER_FROM_EMAIL)', {
+        participantId,
+      });
+      continue;
+    }
+
+    if (!smsTarget) {
       skipped++;
       console.info('sendMessageAlerts: skip recipient', {
         participantId,
         profileId: profile?.id,
+        hasContactEmail: Boolean(profile?.contactEmail?.trim()),
         smsEnabled: profile?.smsNotificationsEnabled,
         hasPhone: Boolean(profile?.phoneNumber?.trim()),
       });
@@ -101,7 +164,7 @@ export const handler: Handler = async (event) => {
     try {
       await sns.send(
         new PublishCommand({
-          PhoneNumber: target.phone,
+          PhoneNumber: smsTarget.phone,
           Message: smsBody,
           MessageAttributes: {
             'AWS.SNS.SMS.SMSType': {
@@ -114,13 +177,13 @@ export const handler: Handler = async (event) => {
       sent++;
       console.info('sendMessageAlerts: SMS sent', {
         participantId,
-        phone: target.phone.replace(/\d(?=\d{4})/g, '*'),
+        phone: smsTarget.phone.replace(/\d(?=\d{4})/g, '*'),
       });
     } catch (err) {
       failed++;
       console.error('sendMessageAlerts: SMS failed', {
         participantId,
-        phone: target.phone,
+        phone: smsTarget.phone,
         err,
       });
     }
@@ -132,7 +195,8 @@ export const handler: Handler = async (event) => {
     failed,
     skipped,
     participantCount: participantUsernames?.length ?? 0,
+    fromEmailConfigured: Boolean(fromEmail),
   });
 
-  return { sent, failed, skipped, conversationId: message.conversationId ?? undefined };
+  return { sent, failed, skipped, conversationId };
 };

@@ -119,7 +119,15 @@ export default function MessageComposer({
           if (errors?.length) {
             console.error('message alert mutation failed', errors);
           } else if (data && data.sent === 0 && (data.failed ?? 0) > 0) {
-            console.error('message alert SMS failed — check SNS sandbox / CloudWatch logs', data);
+            console.error(
+              'message alert delivery failed — check SES/SNS config and CloudWatch logs',
+              data,
+            );
+          } else if (data && data.sent === 0 && (data.skipped ?? 0) > 0) {
+            console.info(
+              'message alert skipped — recipient has no contact email or SMS configured',
+              data,
+            );
           }
         } catch (err) {
           console.error('message alert failed', err);

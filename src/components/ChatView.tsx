@@ -673,7 +673,7 @@ export default function ChatView({
 
   return (
 
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="chat-view flex h-full min-h-0 flex-col overflow-hidden">
 
       <header className="flex items-center gap-3 border-b border-black/30 bg-[var(--color-panel)] px-3 py-2.5">
 
@@ -956,7 +956,7 @@ export default function ChatView({
 
           ref={scrollRef}
 
-          className="chat-scroll h-full min-h-0 overflow-y-auto px-3 py-4 md:px-12"
+          className="chat-scroll px-3 py-4 md:px-12"
 
           style={{
 

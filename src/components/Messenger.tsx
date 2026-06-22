@@ -24,13 +24,9 @@ import { loadUserDirectory } from '../lib/directory';
 
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
 
-import {
-  markConversationReadAt,
-  resolveReadScopeKey,
-} from '../lib/read-state';
 import { loadServerReadState, installReadStateFlushHooks } from '../lib/read-state-sync';
 
-import { computeUnreadCounts, readThroughTimestampForConversation, totalUnreadCount } from '../lib/unread-counts';
+import { computeUnreadCounts, totalUnreadCount } from '../lib/unread-counts';
 
 import {
 
@@ -766,85 +762,15 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-  const markConversationOpened = useCallback(
-
-    (conversation: ConversationModel) => {
-
-      if (!user) return false;
-
-      const readAt =
-        readThroughTimestampForConversation(
-          conversation,
-          conversations,
-          allMessages,
-          user.username,
-          user.cognitoSub,
-          handleToSub,
-        ) ??
-        latestByConversation.get(conversation.id)?.at ??
-        conversation.lastMessageAt ??
-        conversation.updatedAt ??
-        conversation.createdAt;
-
-      if (!readAt) return false;
-
-      const readScopeKey = resolveReadScopeKey(
-
-        conversation,
-
-        user.username,
-
-        user.cognitoSub,
-
-        handleToSub,
-
-      );
-
-      return markConversationReadAt(
-
-        user.cognitoSub,
-
-        user.username,
-
-        readScopeKey,
-
-        readAt,
-
-        conversation.id,
-
-      );
-
-    },
-
-    [allMessages, conversations, handleToSub, latestByConversation, user],
-
-  );
-
-
-
   const handleSelectConversation = useCallback(
 
     (conversationId: string) => {
 
       setSelectedId(conversationId);
 
-      const conversation = mergedConversations.find(
-
-        (item) => item.id === conversationId,
-
-      );
-
-      if (!conversation) return;
-
-      if (markConversationOpened(conversation)) {
-
-        handleConversationUpdated();
-
-      }
-
     },
 
-    [handleConversationUpdated, markConversationOpened, mergedConversations],
+    [],
 
   );
 

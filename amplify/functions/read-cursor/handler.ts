@@ -104,6 +104,7 @@ export const handler: AppSyncResolverHandler<
       const { data, errors } = await client.models.ConversationReadState.update(
         {
           userSub: sub,
+          ownerSubs: [sub],
           readScopeKey,
           lastReadAt: merged,
           conversationId: conversationId ?? existing.conversationId ?? undefined,
@@ -123,6 +124,7 @@ export const handler: AppSyncResolverHandler<
     const { data, errors } = await client.models.ConversationReadState.create(
       {
         userSub: sub,
+        ownerSubs: [sub],
         readScopeKey,
         lastReadAt: merged,
         conversationId: conversationId ?? undefined,

@@ -68,13 +68,19 @@ const schema = a
     ConversationReadState: a
       .model({
         userSub: a.string().required(),
+        ownerSubs: a.string().array().required(),
         readScopeKey: a.string().required(),
         lastReadAt: a.datetime().required(),
         conversationId: a.id(),
       })
       .identifier(['userSub', 'readScopeKey'])
       .secondaryIndexes((index) => [index('userSub')])
-      .authorization(() => []),
+      .authorization((allow) => [
+        allow
+          .ownersDefinedIn('ownerSubs')
+          .identityClaim('sub')
+          .to(['read', 'create', 'update', 'delete']),
+      ]),
 
     ReadCursorRow: a.customType({
       readScopeKey: a.string().required(),

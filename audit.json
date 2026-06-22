@@ -1,0 +1,1575 @@
+﻿{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@ardatan/relay-compiler": {
+      "name": "@ardatan/relay-compiler",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "immutable"
+      ],
+      "effects": [
+        "@graphql-tools/relay-operation-optimizer"
+      ],
+      "range": "<=12.0.3",
+      "nodes": [
+        "node_modules/@ardatan/relay-compiler"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-amplify/ai-constructs": {
+      "name": "@aws-amplify/ai-constructs",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/client-bedrock-runtime"
+      ],
+      "effects": [
+        "@aws-amplify/data-construct",
+        "@aws-amplify/graphql-api-construct"
+      ],
+      "range": "<=0.0.0-test-20250815225305 || 1.4.0 - 1.6.1",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/appsync-modelgen-plugin": {
+      "name": "@aws-amplify/appsync-modelgen-plugin",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@graphql-codegen/plugin-helpers",
+        "@graphql-codegen/visitor-plugin-common"
+      ],
+      "effects": [],
+      "range": "1.29.11-dev.0 - 1.29.12-dev.3 || 1.32.1-dev.0 - 2.0.0-update-dependency.0 || >=2.0.1-dev.1",
+      "nodes": [
+        "node_modules/@aws-amplify/appsync-modelgen-plugin"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-amplify/backend": {
+      "name": "@aws-amplify/backend",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@aws-amplify/backend-data",
+        "@aws-amplify/client-config"
+      ],
+      "effects": [],
+      "range": "<=0.0.0-test-20260601122829 || >=1.2.2",
+      "nodes": [
+        "node_modules/@aws-amplify/backend"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/backend-cli": {
+      "name": "@aws-amplify/backend-cli",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@aws-amplify/client-config",
+        "@aws-amplify/form-generator",
+        "@aws-amplify/model-generator",
+        "@aws-amplify/sandbox"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/@aws-amplify/backend-cli"
+      ],
+      "fixAvailable": false
+    },
+    "@aws-amplify/backend-data": {
+      "name": "@aws-amplify/backend-data",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/data-construct",
+        "@aws-amplify/graphql-generator"
+      ],
+      "effects": [
+        "@aws-amplify/backend"
+      ],
+      "range": "<=0.0.0-test-20260526153030 || >=1.1.4",
+      "nodes": [
+        "node_modules/@aws-amplify/backend-data"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/client-config": {
+      "name": "@aws-amplify/client-config",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/model-generator"
+      ],
+      "effects": [
+        "@aws-amplify/backend",
+        "@aws-amplify/backend-cli",
+        "@aws-amplify/sandbox"
+      ],
+      "range": "<=0.0.0-test-20260526153030 || >=1.5.4",
+      "nodes": [
+        "node_modules/@aws-amplify/client-config"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/data-construct": {
+      "name": "@aws-amplify/data-construct",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/ai-constructs",
+        "@aws-amplify/graphql-api-construct",
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sso",
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/client-sts",
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-login",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/nested-clients",
+        "@opentelemetry/core",
+        "@opentelemetry/resources",
+        "@opentelemetry/sdk-trace-base",
+        "@smithy/config-resolver",
+        "@smithy/middleware-retry",
+        "@smithy/util-defaults-mode-node",
+        "fast-xml-builder",
+        "fast-xml-parser",
+        "uuid"
+      ],
+      "effects": [
+        "@aws-amplify/backend-data"
+      ],
+      "range": ">=1.10.1-ai.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/form-generator": {
+      "name": "@aws-amplify/form-generator",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/appsync-modelgen-plugin",
+        "@aws-amplify/graphql-docs-generator"
+      ],
+      "effects": [
+        "@aws-amplify/backend-cli"
+      ],
+      "range": "<=0.0.0-test-20260526153030 || >=0.1.1-alpha.0",
+      "nodes": [
+        "node_modules/@aws-amplify/form-generator"
+      ],
+      "fixAvailable": false
+    },
+    "@aws-amplify/graphql-api-construct": {
+      "name": "@aws-amplify/graphql-api-construct",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/ai-constructs",
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sso",
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/client-sts",
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-login",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/nested-clients",
+        "@opentelemetry/core",
+        "@opentelemetry/resources",
+        "@opentelemetry/sdk-trace-base",
+        "@smithy/config-resolver",
+        "@smithy/middleware-retry",
+        "@smithy/util-defaults-mode-node",
+        "fast-xml-builder",
+        "fast-xml-parser",
+        "uuid"
+      ],
+      "effects": [],
+      "range": "1.11.6-raven.0 - 1.11.6-sandbox-hotswap.1 || >=1.12.1-async-lambda.0",
+      "nodes": [
+        "node_modules/@aws-amplify/graphql-api-construct"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-amplify/graphql-docs-generator": {
+      "name": "@aws-amplify/graphql-docs-generator",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "handlebars"
+      ],
+      "effects": [
+        "@aws-amplify/form-generator",
+        "@aws-amplify/graphql-generator"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@aws-amplify/graphql-docs-generator"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/graphql-generator": {
+      "name": "@aws-amplify/graphql-generator",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/appsync-modelgen-plugin",
+        "@aws-amplify/graphql-docs-generator",
+        "@graphql-codegen/core",
+        "@graphql-codegen/plugin-helpers"
+      ],
+      "effects": [
+        "@aws-amplify/backend-data",
+        "@aws-amplify/model-generator"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@aws-amplify/graphql-generator"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/model-generator": {
+      "name": "@aws-amplify/model-generator",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/graphql-generator"
+      ],
+      "effects": [
+        "@aws-amplify/backend-cli",
+        "@aws-amplify/client-config"
+      ],
+      "range": "<=0.0.0-test-20260526153030 || >=1.0.9",
+      "nodes": [
+        "node_modules/@aws-amplify/model-generator"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-amplify/sandbox": {
+      "name": "@aws-amplify/sandbox",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@aws-amplify/client-config"
+      ],
+      "effects": [],
+      "range": "<=0.0.0-test-20260526153030 || >=1.2.8",
+      "nodes": [
+        "node_modules/@aws-amplify/sandbox"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/client-bedrock-runtime": {
+      "name": "@aws-sdk/client-bedrock-runtime",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/client-sts",
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/util-user-agent-node",
+        "@smithy/config-resolver",
+        "@smithy/middleware-retry",
+        "@smithy/util-defaults-mode-node",
+        "uuid"
+      ],
+      "effects": [
+        "@aws-amplify/ai-constructs"
+      ],
+      "range": "<=3.895.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-bedrock-runtime",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-bedrock-runtime",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/client-sso": {
+      "name": "@aws-sdk/client-sso",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/util-user-agent-node",
+        "@smithy/config-resolver",
+        "@smithy/middleware-retry",
+        "@smithy/util-defaults-mode-node"
+      ],
+      "effects": [
+        "@aws-sdk/credential-provider-sso"
+      ],
+      "range": "3.363.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/client-sso"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/client-sso-oidc": {
+      "name": "@aws-sdk/client-sso-oidc",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-node",
+        "@smithy/config-resolver",
+        "@smithy/middleware-retry",
+        "@smithy/util-defaults-mode-node"
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sts"
+      ],
+      "range": "3.363.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-sso-oidc",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sso-oidc",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-sso-oidc",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sso-oidc"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/client-sts": {
+      "name": "@aws-sdk/client-sts",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/util-user-agent-node",
+        "@smithy/config-resolver",
+        "@smithy/middleware-retry",
+        "@smithy/util-defaults-mode-node"
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime"
+      ],
+      "range": "3.363.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-sts",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/client-sts",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/core": {
+      "name": "@aws-sdk/core",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/xml-builder",
+        "fast-xml-parser"
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sso",
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/client-sts",
+        "@aws-sdk/credential-provider-env",
+        "@aws-sdk/credential-provider-http",
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-login",
+        "@aws-sdk/credential-provider-process",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/credential-provider-web-identity",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/nested-clients",
+        "@aws-sdk/token-providers"
+      ],
+      "range": "3.529.1 - 3.972.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients/node_modules/@aws-sdk/core"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/credential-provider-env": {
+      "name": "@aws-sdk/credential-provider-env",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core"
+      ],
+      "effects": [
+        "@aws-sdk/credential-provider-node"
+      ],
+      "range": "3.667.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-env",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-env",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-env",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-env"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/credential-provider-http": {
+      "name": "@aws-sdk/credential-provider-http",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core"
+      ],
+      "effects": [],
+      "range": "3.667.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-http",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-http",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-http",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-http"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/credential-provider-ini": {
+      "name": "@aws-sdk/credential-provider-ini",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-env",
+        "@aws-sdk/credential-provider-http",
+        "@aws-sdk/credential-provider-process",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/credential-provider-web-identity",
+        "@aws-sdk/nested-clients"
+      ],
+      "effects": [],
+      "range": "3.363.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-ini",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-ini"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/credential-provider-login": {
+      "name": "@aws-sdk/credential-provider-login",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/nested-clients"
+      ],
+      "effects": [],
+      "range": "<=3.972.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/credential-provider-node": {
+      "name": "@aws-sdk/credential-provider-node",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/credential-provider-env",
+        "@aws-sdk/credential-provider-http",
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-process",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/credential-provider-sso",
+        "@aws-sdk/credential-provider-web-identity"
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/client-sts"
+      ],
+      "range": "3.363.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-node"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/credential-provider-process": {
+      "name": "@aws-sdk/credential-provider-process",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core"
+      ],
+      "effects": [],
+      "range": "3.667.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-process",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-process",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-process",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-process"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/credential-provider-sso": {
+      "name": "@aws-sdk/credential-provider-sso",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/client-sso",
+        "@aws-sdk/client-sso",
+        "@aws-sdk/core",
+        "@aws-sdk/token-providers",
+        "@aws-sdk/token-providers"
+      ],
+      "effects": [
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-node"
+      ],
+      "range": "3.363.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-sso",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-sso"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/credential-provider-web-identity": {
+      "name": "@aws-sdk/credential-provider-web-identity",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/nested-clients"
+      ],
+      "effects": [],
+      "range": "3.667.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-web-identity",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-web-identity",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/credential-provider-web-identity",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/credential-provider-web-identity"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/middleware-user-agent": {
+      "name": "@aws-sdk/middleware-user-agent",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/core"
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sso",
+        "@aws-sdk/client-sts",
+        "@aws-sdk/util-user-agent-node"
+      ],
+      "range": "3.666.0 - 3.972.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/middleware-user-agent",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients/node_modules/@aws-sdk/middleware-user-agent"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/nested-clients": {
+      "name": "@aws-sdk/nested-clients",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/core",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/util-user-agent-node",
+        "@aws-sdk/util-user-agent-node"
+      ],
+      "effects": [
+        "@aws-amplify/data-construct",
+        "@aws-amplify/graphql-api-construct",
+        "@aws-sdk/credential-provider-ini",
+        "@aws-sdk/credential-provider-web-identity",
+        "@aws-sdk/token-providers"
+      ],
+      "range": "<=3.972.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/nested-clients",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/nested-clients",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/nested-clients",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/nested-clients",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/token-providers": {
+      "name": "@aws-sdk/token-providers",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/core",
+        "@aws-sdk/nested-clients"
+      ],
+      "effects": [
+        "@aws-sdk/credential-provider-sso"
+      ],
+      "range": "3.730.0 - 3.893.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/token-providers",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/token-providers",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/token-providers",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/token-providers"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@aws-sdk/util-user-agent-node": {
+      "name": "@aws-sdk/util-user-agent-node",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/middleware-user-agent"
+      ],
+      "effects": [],
+      "range": "3.666.0 - 3.972.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/util-user-agent-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients/node_modules/@aws-sdk/util-user-agent-node"
+      ],
+      "fixAvailable": true
+    },
+    "@aws-sdk/xml-builder": {
+      "name": "@aws-sdk/xml-builder",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "fast-xml-parser"
+      ],
+      "effects": [
+        "@aws-sdk/core"
+      ],
+      "range": "3.894.0 - 3.972.18",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/platform-core/node_modules/@aws-sdk/xml-builder",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/xml-builder",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/platform-core/node_modules/@aws-sdk/xml-builder",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/@aws-sdk/xml-builder"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@graphql-codegen/core": {
+      "name": "@graphql-codegen/core",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@graphql-codegen/plugin-helpers"
+      ],
+      "effects": [],
+      "range": "1.16.4-alpha-27987d17.0 - 1.16.4-alpha-f90a6305.0 || 1.17.4-alpha-01bfb186.0 - 5.0.0-alpha-20250907165954-8bbb206c35a5b3a6c720ebc9dfb218aca4149d1d || 5.0.1-alpha-20260306130656-1bdace2dfce74e6d0133f34e4a4a556caf0fda07 - 5.0.1-alpha-20260306144009-ac6ff8b8e0f162979570ec70806fbe146e7e819a || 6.0.0-alpha-20260319115552-6734f1a6e8c2b9fab70b7418e374635f0e1e539d - 6.0.0-alpha-20260430125644-b20ffe821614c625689575ab43d971db7e7ab327",
+      "nodes": [
+        "node_modules/@graphql-codegen/core"
+      ],
+      "fixAvailable": true
+    },
+    "@graphql-codegen/plugin-helpers": {
+      "name": "@graphql-codegen/plugin-helpers",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "lodash"
+      ],
+      "effects": [
+        "@aws-amplify/appsync-modelgen-plugin",
+        "@aws-amplify/graphql-generator",
+        "@graphql-codegen/core",
+        "@graphql-codegen/visitor-plugin-common"
+      ],
+      "range": "1.17.4-alpha-01bfb186.0 - 6.2.1-alpha-20260402132841-648e5bf0161e5499140abb2fa0350274a3ba8fb3 || 7.0.0-alpha-20260319115552-6734f1a6e8c2b9fab70b7418e374635f0e1e539d - 7.0.0-alpha-20260430125644-b20ffe821614c625689575ab43d971db7e7ab327",
+      "nodes": [
+        "node_modules/@graphql-codegen/plugin-helpers",
+        "node_modules/@graphql-codegen/visitor-plugin-common/node_modules/@graphql-codegen/plugin-helpers"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@graphql-codegen/visitor-plugin-common": {
+      "name": "@graphql-codegen/visitor-plugin-common",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@graphql-codegen/plugin-helpers"
+      ],
+      "effects": [],
+      "range": "1.17.4-alpha-01bfb186.0 - 6.0.0-alpha-20250907165954-8bbb206c35a5b3a6c720ebc9dfb218aca4149d1d || 6.2.0-alpha-20251119131248-4aa0bce27decc294509fae591f5c2236858abdbb || 6.2.4-alpha-20260306130656-1bdace2dfce74e6d0133f34e4a4a556caf0fda07 - 6.2.4-alpha-20260306144009-ac6ff8b8e0f162979570ec70806fbe146e7e819a",
+      "nodes": [
+        "node_modules/@graphql-codegen/visitor-plugin-common"
+      ],
+      "fixAvailable": true
+    },
+    "@graphql-tools/relay-operation-optimizer": {
+      "name": "@graphql-tools/relay-operation-optimizer",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@ardatan/relay-compiler"
+      ],
+      "effects": [],
+      "range": "6.4.14 - 7.0.11",
+      "nodes": [
+        "node_modules/@graphql-tools/relay-operation-optimizer"
+      ],
+      "fixAvailable": true
+    },
+    "@opentelemetry/core": {
+      "name": "@opentelemetry/core",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1120821,
+          "name": "@opentelemetry/core",
+          "dependency": "@opentelemetry/core",
+          "title": "OpenTelemetry Core: Unbounded memory allocation in W3C Baggage propagation",
+          "url": "https://github.com/advisories/GHSA-8988-4f7v-96qf",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-770"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<2.8.0"
+        }
+      ],
+      "effects": [
+        "@opentelemetry/resources",
+        "@opentelemetry/sdk-trace-base"
+      ],
+      "range": "<2.8.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@opentelemetry/core",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@opentelemetry/core"
+      ],
+      "fixAvailable": true
+    },
+    "@opentelemetry/resources": {
+      "name": "@opentelemetry/resources",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@opentelemetry/core"
+      ],
+      "effects": [],
+      "range": "0.8.0 - 2.7.1",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@opentelemetry/resources",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@opentelemetry/resources"
+      ],
+      "fixAvailable": true
+    },
+    "@opentelemetry/sdk-trace-base": {
+      "name": "@opentelemetry/sdk-trace-base",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@opentelemetry/core",
+        "@opentelemetry/resources"
+      ],
+      "effects": [],
+      "range": "<=2.7.1",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@opentelemetry/sdk-trace-base",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@opentelemetry/sdk-trace-base"
+      ],
+      "fixAvailable": true
+    },
+    "@smithy/config-resolver": {
+      "name": "@smithy/config-resolver",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1111987,
+          "name": "@smithy/config-resolver",
+          "dependency": "@smithy/config-resolver",
+          "title": "AWS SDK for JavaScript v3 adopted defense in depth enhancement for region parameter value",
+          "url": "https://github.com/advisories/GHSA-6475-r3vj-m8vf",
+          "severity": "low",
+          "cwe": [
+            "CWE-20"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": "<4.4.0"
+        }
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime",
+        "@aws-sdk/client-sso",
+        "@aws-sdk/client-sso-oidc",
+        "@aws-sdk/client-sts",
+        "@smithy/util-defaults-mode-node"
+      ],
+      "range": "<4.4.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/data-construct/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients/node_modules/@smithy/config-resolver",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@smithy/config-resolver"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@smithy/middleware-retry": {
+      "name": "@smithy/middleware-retry",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "uuid"
+      ],
+      "effects": [],
+      "range": "<=4.2.4",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/data-construct/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients/node_modules/@smithy/middleware-retry",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@smithy/middleware-retry"
+      ],
+      "fixAvailable": true
+    },
+    "@smithy/util-defaults-mode-node": {
+      "name": "@smithy/util-defaults-mode-node",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@smithy/config-resolver"
+      ],
+      "effects": [],
+      "range": "<=3.0.34",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@smithy/util-defaults-mode-node",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@smithy/util-defaults-mode-node"
+      ],
+      "fixAvailable": true
+    },
+    "fast-xml-builder": {
+      "name": "fast-xml-builder",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1118965,
+          "name": "fast-xml-builder",
+          "dependency": "fast-xml-builder",
+          "title": "fast-xml-builder allows attribute values with unwanted quotes to bypass malicious or unwanted attributes",
+          "url": "https://github.com/advisories/GHSA-5wm8-gmm8-39j9",
+          "severity": "high",
+          "cwe": [
+            "CWE-91",
+            "CWE-611"
+          ],
+          "cvss": {
+            "score": 6.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+          },
+          "range": "<=1.1.6"
+        }
+      ],
+      "effects": [
+        "@aws-amplify/data-construct",
+        "@aws-amplify/graphql-api-construct"
+      ],
+      "range": "<=1.1.6",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/platform-core/node_modules/fast-xml-builder",
+        "node_modules/@aws-amplify/data-construct/node_modules/fast-xml-builder",
+        "node_modules/@aws-amplify/data-construct/node_modules/fast-xml-parser/node_modules/fast-xml-builder",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/platform-core/node_modules/fast-xml-builder",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/fast-xml-builder",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/fast-xml-parser/node_modules/fast-xml-builder"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "fast-xml-parser": {
+      "name": "fast-xml-parser",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1113153,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser has RangeError DoS Numeric Entities Bug",
+          "url": "https://github.com/advisories/GHSA-37qj-frw5-hhjh",
+          "severity": "high",
+          "cwe": [
+            "CWE-20",
+            "CWE-248"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=5.0.9 <=5.3.3"
+        },
+        {
+          "source": 1113567,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser has an entity encoding bypass via regex injection in DOCTYPE entity names",
+          "url": "https://github.com/advisories/GHSA-m7jm-9gc2-mpf2",
+          "severity": "critical",
+          "cwe": [
+            "CWE-185"
+          ],
+          "cvss": {
+            "score": 9.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:L/I:H/A:N"
+          },
+          "range": ">=4.1.3 <4.5.4"
+        },
+        {
+          "source": 1113568,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser has an entity encoding bypass via regex injection in DOCTYPE entity names",
+          "url": "https://github.com/advisories/GHSA-m7jm-9gc2-mpf2",
+          "severity": "critical",
+          "cwe": [
+            "CWE-185"
+          ],
+          "cvss": {
+            "score": 9.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:L/I:H/A:N"
+          },
+          "range": ">=5.0.0 <5.3.5"
+        },
+        {
+          "source": 1113569,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser affected by DoS through entity expansion in DOCTYPE (no expansion limit)",
+          "url": "https://github.com/advisories/GHSA-jmr7-xgp7-cmfj",
+          "severity": "high",
+          "cwe": [
+            "CWE-776"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=5.0.0 <5.3.6"
+        },
+        {
+          "source": 1113570,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser affected by DoS through entity expansion in DOCTYPE (no expansion limit)",
+          "url": "https://github.com/advisories/GHSA-jmr7-xgp7-cmfj",
+          "severity": "high",
+          "cwe": [
+            "CWE-776"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=4.1.3 <4.5.4"
+        },
+        {
+          "source": 1114149,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser has stack overflow in XMLBuilder with preserveOrder",
+          "url": "https://github.com/advisories/GHSA-fj3w-jwp8-x2g3",
+          "severity": "low",
+          "cwe": [
+            "CWE-120"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=4.0.0-beta.0 <4.5.4"
+        },
+        {
+          "source": 1114153,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser has stack overflow in XMLBuilder with preserveOrder",
+          "url": "https://github.com/advisories/GHSA-fj3w-jwp8-x2g3",
+          "severity": "low",
+          "cwe": [
+            "CWE-120"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=5.0.0 <5.3.8"
+        },
+        {
+          "source": 1115338,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser affected by numeric entity expansion bypassing all entity expansion limits (incomplete fix for CVE-2026-26278)",
+          "url": "https://github.com/advisories/GHSA-8gc5-j5rx-235r",
+          "severity": "high",
+          "cwe": [
+            "CWE-776"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=4.0.0-beta.3 <4.5.5"
+        },
+        {
+          "source": 1115339,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser affected by numeric entity expansion bypassing all entity expansion limits (incomplete fix for CVE-2026-26278)",
+          "url": "https://github.com/advisories/GHSA-8gc5-j5rx-235r",
+          "severity": "high",
+          "cwe": [
+            "CWE-776"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=5.0.0 <5.5.6"
+        },
+        {
+          "source": 1116307,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "Entity Expansion Limits Bypassed When Set to Zero Due to JavaScript Falsy Evaluation in fast-xml-parser",
+          "url": "https://github.com/advisories/GHSA-jp2q-39xq-3w4g",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.9,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=5.0.0 <5.5.7"
+        },
+        {
+          "source": 1116308,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "Entity Expansion Limits Bypassed When Set to Zero Due to JavaScript Falsy Evaluation in fast-xml-parser",
+          "url": "https://github.com/advisories/GHSA-jp2q-39xq-3w4g",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.9,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=4.0.0-beta.3 <4.5.5"
+        },
+        {
+          "source": 1117911,
+          "name": "fast-xml-parser",
+          "dependency": "fast-xml-parser",
+          "title": "fast-xml-parser XMLBuilder: XML Comment and CDATA Injection via Unescaped Delimiters",
+          "url": "https://github.com/advisories/GHSA-gh4j-gqv2-49f6",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-91"
+          ],
+          "cvss": {
+            "score": 6.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+          },
+          "range": "<5.7.0"
+        }
+      ],
+      "effects": [
+        "@aws-amplify/data-construct",
+        "@aws-amplify/graphql-api-construct",
+        "@aws-sdk/core",
+        "@aws-sdk/xml-builder"
+      ],
+      "range": "<=5.6.0",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/ai-constructs/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/platform-core/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/client-sts/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/core/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-sdk/nested-clients/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/data-construct/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/ai-constructs/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/platform-core/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-bedrock-runtime/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/client-sts/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/core/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/credential-provider-login/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-sdk/nested-clients/node_modules/fast-xml-parser",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/fast-xml-parser"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "handlebars": {
+      "name": "handlebars",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1115538,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has JavaScript Injection via AST Type Confusion by tampering @partial-block",
+          "url": "https://github.com/advisories/GHSA-3mfm-83xf-c92r",
+          "severity": "high",
+          "cwe": [
+            "CWE-94",
+            "CWE-843"
+          ],
+          "cvss": {
+            "score": 8.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": ">=4.0.0 <=4.7.8"
+        },
+        {
+          "source": 1115539,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has JavaScript Injection via AST Type Confusion",
+          "url": "https://github.com/advisories/GHSA-2w6w-674q-4c4q",
+          "severity": "critical",
+          "cwe": [
+            "CWE-94",
+            "CWE-843"
+          ],
+          "cvss": {
+            "score": 9.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": ">=4.0.0 <=4.7.8"
+        },
+        {
+          "source": 1115544,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has Prototype Pollution Leading to XSS through Partial Template Injection",
+          "url": "https://github.com/advisories/GHSA-2qvq-rjwj-gvw9",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-79",
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 4.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N"
+          },
+          "range": ">=4.0.0 <4.7.9"
+        },
+        {
+          "source": 1115588,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has a Prototype Method Access Control Gap via Missing __lookupSetter__ Blocklist Entry",
+          "url": "https://github.com/advisories/GHSA-7rx3-28cr-v5wh",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 4.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+          },
+          "range": ">=4.6.0 <=4.7.8"
+        },
+        {
+          "source": 1115589,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has a Property Access Validation Bypass in container.lookup",
+          "url": "https://github.com/advisories/GHSA-442j-39wm-28r2",
+          "severity": "low",
+          "cwe": [
+            "CWE-367"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": ">=4.0.0 <=4.7.8"
+        },
+        {
+          "source": 1115693,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has JavaScript Injection via AST Type Confusion when passing an object as dynamic partial",
+          "url": "https://github.com/advisories/GHSA-xhpv-hc6g-r9c6",
+          "severity": "high",
+          "cwe": [
+            "CWE-94",
+            "CWE-843"
+          ],
+          "cvss": {
+            "score": 8.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": ">=4.0.0 <=4.7.8"
+        },
+        {
+          "source": 1115694,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has Denial of Service via Malformed Decorator Syntax in Template Compilation",
+          "url": "https://github.com/advisories/GHSA-9cx6-37pm-9jff",
+          "severity": "high",
+          "cwe": [
+            "CWE-754"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=4.0.0 <=4.7.8"
+        },
+        {
+          "source": 1117465,
+          "name": "handlebars",
+          "dependency": "handlebars",
+          "title": "Handlebars.js has JavaScript Injection in CLI Precompiler via Unescaped Names and Options",
+          "url": "https://github.com/advisories/GHSA-xjpj-3mr7-gcpf",
+          "severity": "high",
+          "cwe": [
+            "CWE-79",
+            "CWE-94",
+            "CWE-116"
+          ],
+          "cvss": {
+            "score": 8.2,
+            "vectorString": "CVSS:3.1/AV:L/AC:L/PR:L/UI:R/S:C/C:H/I:H/A:H"
+          },
+          "range": ">=4.0.0 <=4.7.8"
+        }
+      ],
+      "effects": [
+        "@aws-amplify/graphql-docs-generator"
+      ],
+      "range": "4.0.0 - 4.7.8",
+      "nodes": [
+        "node_modules/handlebars"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "immutable": {
+      "name": "immutable",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1117066,
+          "name": "immutable",
+          "dependency": "immutable",
+          "title": "Immutable is vulnerable to Prototype Pollution",
+          "url": "https://github.com/advisories/GHSA-wf6x-7x77-mvgw",
+          "severity": "high",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 9.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": "<3.8.3"
+        }
+      ],
+      "effects": [
+        "@ardatan/relay-compiler"
+      ],
+      "range": "<3.8.3",
+      "nodes": [
+        "node_modules/immutable"
+      ],
+      "fixAvailable": true
+    },
+    "lodash": {
+      "name": "lodash",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1115806,
+          "name": "lodash",
+          "dependency": "lodash",
+          "title": "lodash vulnerable to Code Injection via `_.template` imports key names",
+          "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+          "severity": "high",
+          "cwe": [
+            "CWE-94"
+          ],
+          "cvss": {
+            "score": 8.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": ">=4.0.0 <=4.17.23"
+        },
+        {
+          "source": 1115810,
+          "name": "lodash",
+          "dependency": "lodash",
+          "title": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`",
+          "url": "https://github.com/advisories/GHSA-f23m-r3pf-42rh",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 6.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+          },
+          "range": "<=4.17.23"
+        }
+      ],
+      "effects": [
+        "@graphql-codegen/plugin-helpers"
+      ],
+      "range": "<=4.17.23",
+      "nodes": [
+        "node_modules/@graphql-codegen/plugin-helpers/node_modules/lodash",
+        "node_modules/@graphql-codegen/visitor-plugin-common/node_modules/lodash"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    },
+    "uuid": {
+      "name": "uuid",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1119441,
+          "name": "uuid",
+          "dependency": "uuid",
+          "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+          "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-787",
+            "CWE-1285"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+          },
+          "range": "<11.1.1"
+        }
+      ],
+      "effects": [
+        "@aws-sdk/client-bedrock-runtime",
+        "@smithy/middleware-retry"
+      ],
+      "range": "<11.1.1",
+      "nodes": [
+        "node_modules/@aws-amplify/data-construct/node_modules/@aws-amplify/platform-core/node_modules/uuid",
+        "node_modules/@aws-amplify/data-construct/node_modules/uuid",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/@aws-amplify/platform-core/node_modules/uuid",
+        "node_modules/@aws-amplify/graphql-api-construct/node_modules/uuid"
+      ],
+      "fixAvailable": {
+        "name": "@aws-amplify/backend",
+        "version": "1.2.1",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 3,
+      "moderate": 23,
+      "high": 20,
+      "critical": 2,
+      "total": 48
+    },
+    "dependencies": {
+      "prod": 183,
+      "dev": 2269,
+      "optional": 118,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 2451
+    }
+  }
+}

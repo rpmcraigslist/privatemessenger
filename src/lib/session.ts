@@ -8,10 +8,10 @@ import {
   type SignInOutput,
 } from 'aws-amplify/auth';
 import { client } from './amplify';
+import { sessionUserFromSyncProfile } from './api-contract';
 import {
   isCognitoUuid,
   normalizeUsername,
-  pickUserHandle,
   toLoginId,
   usernameFromAttributes,
 } from './util';
@@ -106,20 +106,13 @@ export async function syncMyProfile(
     throw new Error(errors?.[0]?.message ?? 'Profile sync failed');
   }
 
-  const username = pickUserHandle(
+  const user = sessionUserFromSyncProfile(
+    data,
     resolvedHandle,
     recalledSignInHandle(),
-    data.username,
   );
-  rememberSignInHandle(username);
-
-  return {
-    username,
-    cognitoSub: data.cognitoSub,
-    isAdmin: data.role === 'admin',
-    contactEmail: data.contactEmail ?? null,
-    profileId: data.profileId,
-  };
+  rememberSignInHandle(user.username);
+  return user;
 }
 
 export async function resolveCurrentUser(): Promise<SessionUser> {
@@ -138,6 +131,21 @@ export async function ensureValidSession(): Promise<boolean> {
       // ignore
     }
     return false;
+  }
+}
+
+/** Like ensureValidSession but surfaces the server error to the UI. */
+export async function resolveCurrentUserOrThrow(): Promise<SessionUser> {
+  try {
+    return await resolveCurrentUser();
+  } catch (err) {
+    console.error('profile sync failed', err);
+    try {
+      await signOutAndClear();
+    } catch {
+      // ignore
+    }
+    throw err;
   }
 }
 

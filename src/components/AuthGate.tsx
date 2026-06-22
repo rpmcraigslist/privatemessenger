@@ -10,6 +10,8 @@ import {
 
   rememberSignInHandle,
 
+  resolveCurrentUserOrThrow,
+
   signInWithUsername,
 
   signOutAndClear,
@@ -246,9 +248,7 @@ export default function AuthGate({ children }: Props) {
 
       }
 
-      const ok = await ensureValidSession();
-
-      if (!ok) throw new Error('Profile sync failed after sign-in. Redeploy sandbox and try again.');
+      await resolveCurrentUserOrThrow();
 
       setMode('authed');
 
@@ -286,9 +286,7 @@ export default function AuthGate({ children }: Props) {
 
       await completeNewPassword(newPassword);
 
-      const ok = await ensureValidSession();
-
-      if (!ok) throw new Error('Profile sync failed after password change. Redeploy sandbox and try again.');
+      await resolveCurrentUserOrThrow();
 
       setMode('authed');
 

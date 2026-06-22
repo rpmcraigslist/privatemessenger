@@ -7,10 +7,13 @@ import { env } from '$amplify/env/profile-sync';
 import {
   isAdminGroupMember,
   isCognitoUuid,
-  normalizeContactEmail,
   parseIdentity,
   resolveUsernameFromPool,
 } from '../shared/cognito';
+import {
+  buildSyncProfileResponse,
+  resolveContactEmailAfterSync,
+} from '../shared/profile-sync-logic';
 import {
   conversationIncludesUser,
   repairParticipantList,
@@ -90,48 +93,51 @@ export const handler: Handler = async (event) => {
   const client = await dataClientPromise;
 
   const existing = await consolidateUserProfiles(client, username, sub);
+  const contactEmail = resolveContactEmailAfterSync({
+    existing: existing?.contactEmail,
+    emailArg,
+  });
 
-  let contactEmail = existing?.contactEmail ?? null;
-  if (emailArg !== undefined && emailArg !== null) {
-    const trimmed = emailArg.trim();
-    if (!trimmed) {
-      contactEmail = null;
-    } else {
-      contactEmail = normalizeContactEmail(trimmed);
-      if (!contactEmail) {
-        throw new Error('Enter a valid email address');
-      }
-    }
-  }
+  const role =
+    existing?.role === 'admin' || isAdmin ? 'admin' : (existing?.role ?? 'user');
 
   if (!existing) {
-    const created = await client.models.UserProfile.create(
+    const { data: created, errors } = await client.models.UserProfile.create(
       {
         username,
         cognitoSub: sub,
         displayName: username,
-        role: isAdmin ? 'admin' : 'user',
+        role,
         contactEmail,
         smsNotificationsEnabled: false,
         avatarColor: isAdmin ? '#00a884' : '#64b5f6',
       },
       { authMode: 'iam' },
     );
+    if (errors?.length) {
+      throw new Error(errors[0].message ?? 'Could not create profile');
+    }
+    if (!created?.id) {
+      throw new Error('Could not create profile');
+    }
+
     await consolidateUserProfiles(client, username, sub);
-    await repairMembershipRecords(client, username, sub);
-    return {
-      profileId: created.data?.id ?? '',
+    try {
+      await repairMembershipRecords(client, username, sub);
+    } catch (err) {
+      console.error('membership repair failed after profile create', err);
+    }
+
+    return buildSyncProfileResponse(
+      created.id,
       username,
-      cognitoSub: sub,
-      role: isAdmin ? 'admin' : 'user',
+      sub,
+      role,
       contactEmail,
-    };
+    );
   }
 
-  const role =
-    existing.role === 'admin' || isAdmin ? 'admin' : (existing.role ?? 'user');
-
-  await client.models.UserProfile.update(
+  const { errors } = await client.models.UserProfile.update(
     {
       id: existing.id,
       username,
@@ -141,14 +147,21 @@ export const handler: Handler = async (event) => {
     },
     { authMode: 'iam' },
   );
+  if (errors?.length) {
+    throw new Error(errors[0].message ?? 'Could not update profile');
+  }
 
-  await repairMembershipRecords(client, username, sub);
+  try {
+    await repairMembershipRecords(client, username, sub);
+  } catch (err) {
+    console.error('membership repair failed after profile update', err);
+  }
 
-  return {
-    profileId: existing.id,
+  return buildSyncProfileResponse(
+    existing.id,
     username,
-    cognitoSub: sub,
+    sub,
     role,
     contactEmail,
-  };
+  );
 };

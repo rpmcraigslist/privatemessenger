@@ -98,6 +98,13 @@
               "isRequired": false,
               "attributes": []
             },
+            "contactEmail": {
+              "name": "contactEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
             "createdAt": {
               "name": "createdAt",
               "isArray": false,
@@ -603,6 +610,13 @@
               "type": "String",
               "isRequired": true,
               "attributes": []
+            },
+            "contactEmail": {
+              "name": "contactEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
             }
           }
         }
@@ -670,6 +684,12 @@
               "isArray": false,
               "type": "String",
               "isRequired": false
+            },
+            "contactEmail": {
+              "name": "contactEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
             }
           }
         },
@@ -695,6 +715,12 @@
             },
             "phoneNumber": {
               "name": "phoneNumber",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
+            },
+            "contactEmail": {
+              "name": "contactEmail",
               "isArray": false,
               "type": "String",
               "isRequired": false
@@ -763,8 +789,8 @@
           },
           "isRequired": false,
           "arguments": {
-            "phoneNumber": {
-              "name": "phoneNumber",
+            "contactEmail": {
+              "name": "contactEmail",
               "isArray": false,
               "type": "String",
               "isRequired": false

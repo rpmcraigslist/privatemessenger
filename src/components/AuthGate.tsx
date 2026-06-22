@@ -30,6 +30,8 @@ import {
 
 import { NoSaveField, NoSaveForm } from './NoSaveCredentials';
 
+import { APP_VERSION } from '../lib/app-version';
+
 
 
 type Props = {
@@ -529,6 +531,10 @@ function AuthShell({
         <p className="mb-6 text-sm text-[var(--color-muted)]">{subtitle}</p>
 
         {children}
+
+        <p className="mt-6 text-center text-xs text-[var(--color-muted)]">
+          Version {APP_VERSION}
+        </p>
 
       </div>
 

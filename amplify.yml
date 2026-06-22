@@ -5,7 +5,9 @@ backend:
       commands:
         - node -v && npm -v
         - npm install --cache .npm --prefer-offline --no-audit
+        - npm run typecheck
         - npm run typecheck:backend
+        - npm run test
         - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
 frontend:
   phases:
@@ -13,7 +15,9 @@ frontend:
       commands:
         - node -v && npm -v
         - npm install --cache .npm --prefer-offline --no-audit
+        - npm run typecheck
         - npm run typecheck:backend
+        - npm run test
     build:
       commands:
         - npm run build

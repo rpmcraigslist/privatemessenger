@@ -21,6 +21,8 @@ import {
   type SessionUser,
 } from '../lib/session';
 
+import { NoSaveField } from './NoSaveCredentials';
+
 type Props = {
   user: SessionUser;
   onClose: () => void;
@@ -126,27 +128,27 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
           </button>
         </header>
 
-        <form onSubmit={(e) => void save(e)} className="space-y-4">
-          <label className="block">
-            <span className="mb-1 block text-sm text-[var(--color-muted)]">
-              Email address (optional)
-            </span>
-            <input
-              type="email"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 outline-none"
-            />
-          </label>
+        <form
+          onSubmit={(e) => void save(e)}
+          className="space-y-4"
+          autoComplete="off"
+          data-no-save-password="true"
+        >
+          <NoSaveField
+            label="Email address (optional)"
+            type="email"
+            value={contactEmail}
+            onChange={setContactEmail}
+            placeholder="you@example.com"
+          />
 
           {isNotificationSupported() && (
             <section className="space-y-3 border-t border-white/10 pt-4">
               <div>
                 <h3 className="text-sm font-medium">Message alerts</h3>
                 <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-                  Optional pop-up alerts and sound while you use the app.
+                  Optional alerts while the app is open in your browser. These are
+                  not text messages and cost nothing.
                 </p>
               </div>
 
@@ -158,9 +160,12 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                   className="mt-1"
                 />
                 <span className="text-sm">
-                  <span className="font-medium">Browser notifications</span>
+                  <span className="font-medium">Pop-up when a message arrives</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
-                    Notify when a new message arrives while you are away.
+                    Shows a small system notification (like other websites) when
+                    someone messages you and you are in another tab, another chat,
+                    or the app is in the background. Your browser will ask for
+                    permission the first time you turn this on.
                     {getNotificationPermission() === 'denied'
                       ? ' Currently blocked in browser settings.'
                       : ''}

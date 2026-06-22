@@ -55,8 +55,8 @@ type NoSaveFieldProps = {
   label?: string;
   value: string;
   onChange: (value: string) => void;
-  type?: 'text' | 'password' | 'tel';
-  inputMode?: 'text' | 'tel';
+  type?: 'text' | 'password' | 'tel' | 'email';
+  inputMode?: 'text' | 'tel' | 'email';
   placeholder?: string;
   className?: string;
 };
@@ -74,12 +74,20 @@ export function NoSaveField({
   const fieldId = useId();
   const [unlocked, setUnlocked] = useState(false);
   const isPassword = type === 'password';
+  const isEmail = type === 'email';
 
   function unlock() {
     if (!unlocked) setUnlocked(true);
   }
 
-  const inputType = isPassword ? (unlocked ? 'password' : 'text') : type;
+  const inputType = isPassword
+    ? unlocked
+      ? 'password'
+      : 'text'
+    : isEmail
+      ? 'text'
+      : type;
+  const resolvedInputMode = inputMode ?? (isEmail ? 'email' : undefined);
   const maskedTextStyle: CSSProperties | undefined =
     isPassword && !unlocked
       ? ({ WebkitTextSecurity: 'disc' } as CSSProperties)
@@ -93,7 +101,7 @@ export function NoSaveField({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      inputMode={inputMode}
+      inputMode={resolvedInputMode}
       autoComplete="off"
       autoCorrect="off"
       autoCapitalize="off"

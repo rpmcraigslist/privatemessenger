@@ -28,9 +28,9 @@ import {
   markConversationReadAt,
   resolveReadScopeKey,
 } from '../lib/read-state';
-import { loadServerReadState } from '../lib/read-state-sync';
+import { loadServerReadState, installReadStateFlushHooks } from '../lib/read-state-sync';
 
-import { computeUnreadCounts, totalUnreadCount } from '../lib/unread-counts';
+import { computeUnreadCounts, readThroughTimestampForConversation, totalUnreadCount } from '../lib/unread-counts';
 
 import {
 
@@ -302,7 +302,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     const sessionUser = await resolveCurrentUser();
 
-    await loadServerReadState(sessionUser.cognitoSub);
+    await loadServerReadState(sessionUser.cognitoSub, sessionUser.username);
 
     setUser(sessionUser);
 
@@ -363,6 +363,16 @@ export default function Messenger({ onSignOut }: Props) {
     void reloadDirectory();
 
   }, [user?.username, reloadDirectory]);
+
+
+
+  useEffect(() => {
+
+    if (!user) return;
+
+    return installReadStateFlushHooks();
+
+  }, [user?.cognitoSub]);
 
 
 
@@ -700,13 +710,15 @@ export default function Messenger({ onSignOut }: Props) {
 
   const unreadCounts = useMemo(() => {
 
-    if (!user || conversations.length === 0) {
+    if (!user || mergedConversations.length === 0) {
 
       return new Map<string, number>();
 
     }
 
     return computeUnreadCounts(
+
+      mergedConversations,
 
       conversations,
 
@@ -731,6 +743,8 @@ export default function Messenger({ onSignOut }: Props) {
     conversations,
 
     handleToSub,
+
+    mergedConversations,
 
     readRevision,
 
@@ -759,13 +773,17 @@ export default function Messenger({ onSignOut }: Props) {
       if (!user) return false;
 
       const readAt =
-
+        readThroughTimestampForConversation(
+          conversation,
+          conversations,
+          allMessages,
+          user.username,
+          user.cognitoSub,
+          handleToSub,
+        ) ??
         latestByConversation.get(conversation.id)?.at ??
-
         conversation.lastMessageAt ??
-
         conversation.updatedAt ??
-
         conversation.createdAt;
 
       if (!readAt) return false;
@@ -798,7 +816,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     },
 
-    [handleToSub, latestByConversation, user],
+    [allMessages, conversations, handleToSub, latestByConversation, user],
 
   );
 

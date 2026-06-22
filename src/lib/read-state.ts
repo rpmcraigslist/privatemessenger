@@ -252,3 +252,80 @@ export function readCursorForMessages(
 ): string | null {
   return maxIsoTimestamp(lastReadAt, latestMessageTimestamp(messages));
 }
+
+/** All conversation ids that share the same read cursor (duplicate 1:1 threads). */
+export function collectConversationIdsForReadScope(
+  conversation: ConversationLike,
+  allConversations: readonly ConversationLike[],
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string[] {
+  const scope = resolveReadScopeKey(
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  const ids = new Set<string>([conversation.id]);
+  for (const candidate of allConversations) {
+    if (
+      resolveReadScopeKey(candidate, myUsername, mySub, handleToSub) === scope
+    ) {
+      ids.add(candidate.id);
+    }
+  }
+  return [...ids];
+}
+
+export function messagesForReadScope(
+  conversation: ConversationLike,
+  allConversations: readonly ConversationLike[],
+  allMessages: readonly MessageModel[],
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): MessageModel[] {
+  const conversationIds = new Set(
+    collectConversationIdsForReadScope(
+      conversation,
+      allConversations,
+      myUsername,
+      mySub,
+      handleToSub,
+    ),
+  );
+  return allMessages.filter(
+    (message) =>
+      !!message.conversationId && conversationIds.has(message.conversationId),
+  );
+}
+
+/** Best read-through timestamp for a thread using stored cursor and loaded messages. */
+export function effectiveLastReadAt(
+  sub: string,
+  username: string,
+  conversation: ConversationLike,
+  allConversations: readonly ConversationLike[],
+  allMessages: readonly MessageModel[],
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string | null {
+  const readScopeKey = resolveReadScopeKey(
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  const stored = getLastReadAt(sub, username, readScopeKey, conversation.id);
+  const scopedMessages = messagesForReadScope(
+    conversation,
+    allConversations,
+    allMessages,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  return readCursorForMessages(stored, scopedMessages);
+}

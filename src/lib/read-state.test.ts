@@ -15,6 +15,8 @@ vi.mock('./read-state-sync', () => ({
   mergeServerLastReadAt: vi.fn(),
   loadServerReadState: vi.fn(),
   resetReadStateSync: vi.fn(),
+  flushReadStateNow: vi.fn(),
+  installReadStateFlushHooks: vi.fn(),
 }));
 
 const SCOPE = 'conv:conv-1';

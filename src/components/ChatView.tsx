@@ -3,8 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 
 import {
-  findLastUnreadMessage,
-  getLastReadAt,
   markConversationReadThrough,
   resolveReadScopeKey,
 } from '../lib/read-state';
@@ -527,84 +525,20 @@ export default function ChatView({
 
     if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
 
-    const lastReadAt = getLastReadAt(
-      mySub,
-      myUsername,
-      readScopeKey,
-      conversation.id,
-    );
-
-    const lastUnread = findLastUnreadMessage(
-
-      messages,
-
-      lastReadAt,
-
-      myUsername,
-
-      mySub,
-
-      subToUsername,
-
-      handleToSub,
-
-    );
-
-    let scrolled = false;
-
-    if (lastUnread) {
-
-      scrolled = scrollToMessage(lastUnread.id, {
-
-        flash: false,
-
-        block: 'end',
-
-        behavior: 'instant',
-
-      });
-
-    } else {
-
-      stickToBottomRef.current = true;
-
-      pinToBottom(true);
-
-      scrolled = true;
-
-    }
-
+    stickToBottomRef.current = true;
+    pinToBottom(true);
     markVisibleMessagesRead(messages);
-
-    if (scrolled) {
-
-      entryScrollDoneRef.current = true;
-
-    }
+    entryScrollDoneRef.current = true;
 
   }, [
 
-    conversation.id,
+    markVisibleMessagesRead,
 
     messages,
 
     messagesSynced,
 
-    markVisibleMessagesRead,
-
-    mySub,
-
-    myUsername,
-
     pinToBottom,
-
-    readScopeKey,
-
-    handleToSub,
-
-    scrollToMessage,
-
-    subToUsername,
 
   ]);
 

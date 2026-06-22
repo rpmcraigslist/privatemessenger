@@ -173,6 +173,9 @@ export default function ChatView({
   }, [chatBackRef, messageMenu, replyTo, searchOpen, showDetails]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatViewRef = useRef<HTMLDivElement>(null);
+  const topChromeRef = useRef<HTMLDivElement>(null);
+  const composerPaneRef = useRef<HTMLElement>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -292,6 +295,29 @@ export default function ChatView({
     setMessageMenu(null);
 
   }, [conversation.id]);
+
+
+
+  useEffect(() => {
+    const view = chatViewRef.current;
+    const top = topChromeRef.current;
+    const composer = composerPaneRef.current;
+    if (!view || !top || !composer) return;
+
+    const syncHeights = () => {
+      view.style.setProperty('--chat-top-height', `${top.offsetHeight}px`);
+      view.style.setProperty(
+        '--chat-composer-height',
+        `${composer.offsetHeight}px`,
+      );
+    };
+
+    syncHeights();
+    const observer = new ResizeObserver(syncHeights);
+    observer.observe(top);
+    observer.observe(composer);
+    return () => observer.disconnect();
+  }, [actionError, conversation.id, replyTo, searchOpen]);
 
 
 
@@ -673,7 +699,9 @@ export default function ChatView({
 
   return (
 
-    <div className="chat-view flex h-full min-h-0 flex-col overflow-hidden">
+    <div ref={chatViewRef} className="chat-view">
+
+      <div ref={topChromeRef} className="chat-view-top">
 
       <header className="flex items-center gap-3 border-b border-black/30 bg-[var(--color-panel)] px-3 py-2.5">
 
@@ -945,6 +973,8 @@ export default function ChatView({
 
       )}
 
+      </div>
+
 
 
       <section
@@ -1124,7 +1154,11 @@ export default function ChatView({
 
 
 
-      <section className="chat-composer-pane" aria-label="Message composer">
+      <section
+        ref={composerPaneRef}
+        className="chat-composer-pane"
+        aria-label="Message composer"
+      >
 
       {actionError && (
 

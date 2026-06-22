@@ -1096,7 +1096,7 @@ export default function Messenger({ onSignOut }: Props) {
 
           selectedId ? 'flex' : 'hidden md:flex'
 
-        } h-full min-w-0 flex-1 flex-col`}
+        } h-full min-h-0 max-h-full min-w-0 flex-1 flex-col overflow-hidden`}
 
       >
 

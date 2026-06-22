@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageModel } from './amplify';
 import {
   countUnreadMessages,
+  findFirstUnreadMessage,
   findLastUnreadMessage,
   getLastReadAt,
   isReadThrough,
@@ -153,6 +154,50 @@ describe('read-state', () => {
         new Map(),
       ),
     ).toBe(0);
+  });
+
+  it('findFirstUnreadMessage returns the oldest unread from others', () => {
+    const subMap = new Map<string, string>();
+    const messages: MessageModel[] = [
+      {
+        id: '1',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T11:00:00.000Z',
+        updatedAt: '2026-06-20T11:00:00.000Z',
+      } as MessageModel,
+      {
+        id: '2',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['my-sub'],
+        createdAt: '2026-06-20T12:00:00.000Z',
+        updatedAt: '2026-06-20T12:00:00.000Z',
+      } as MessageModel,
+    ];
+
+    expect(
+      findFirstUnreadMessage(
+        messages,
+        '2026-06-20T10:00:00.000Z',
+        'me',
+        'my-sub',
+        subMap,
+        new Map(),
+      )?.id,
+    ).toBe('1');
+
+    expect(
+      findFirstUnreadMessage(
+        messages,
+        '2026-06-20T12:00:00.000Z',
+        'me',
+        'my-sub',
+        subMap,
+        new Map(),
+      ),
+    ).toBeNull();
   });
 
   it('findLastUnreadMessage returns the newest unread from others', () => {

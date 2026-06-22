@@ -72,6 +72,18 @@ body {
   overflow: hidden;
 }
 
+.chat-messages-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-composer-pane {
+  flex: 0 0 auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+  background: var(--color-panel);
+}
+
 /* Subtle scrollbar that matches the dark theme. */
 * {
   scrollbar-width: thin;

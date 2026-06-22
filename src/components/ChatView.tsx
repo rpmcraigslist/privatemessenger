@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import { client, type ConversationModel, type MessageModel } from '../lib/amplify';
 
 import {
+  findFirstUnreadMessage,
+  getLastReadAt,
   markConversationReadThrough,
   resolveReadScopeKey,
 } from '../lib/read-state';
@@ -525,12 +527,51 @@ export default function ChatView({
 
     if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
 
-    stickToBottomRef.current = true;
-    pinToBottom(true);
+    const lastReadAt = getLastReadAt(
+      mySub,
+      myUsername,
+      readScopeKey,
+      conversation.id,
+    );
+    const firstUnread = findFirstUnreadMessage(
+      messages,
+      lastReadAt,
+      myUsername,
+      mySub,
+      subToUsername,
+      handleToSub,
+    );
+
+    let positioned = false;
+
+    if (firstUnread?.id) {
+      positioned = scrollToMessage(firstUnread.id, {
+        flash: false,
+        block: 'start',
+        behavior: 'instant',
+      });
+      if (positioned) {
+        stickToBottomRef.current = false;
+      }
+    }
+
+    if (!firstUnread || !positioned) {
+      stickToBottomRef.current = true;
+      pinToBottom(true);
+      positioned = true;
+    }
+
     markVisibleMessagesRead(messages);
-    entryScrollDoneRef.current = true;
+
+    if (positioned) {
+      entryScrollDoneRef.current = true;
+    }
 
   }, [
+
+    conversation.id,
+
+    handleToSub,
 
     markVisibleMessagesRead,
 
@@ -538,7 +579,17 @@ export default function ChatView({
 
     messagesSynced,
 
+    mySub,
+
+    myUsername,
+
     pinToBottom,
+
+    readScopeKey,
+
+    scrollToMessage,
+
+    subToUsername,
 
   ]);
 
@@ -896,31 +947,36 @@ export default function ChatView({
 
 
 
-      <div
-
-        ref={scrollRef}
-
-        className="chat-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4 md:px-12"
-
-        style={{
-
-          backgroundColor: 'var(--color-app-bg)',
-
-          backgroundImage:
-
-            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)',
-
-          backgroundSize: '22px 22px',
-
-          overflowAnchor: 'none',
-
-          overscrollBehavior: 'none',
-
-          touchAction: 'pan-y pinch-zoom',
-
-        }}
-
+      <section
+        className="chat-messages-pane"
+        aria-label="Conversation messages"
       >
+
+        <div
+
+          ref={scrollRef}
+
+          className="chat-scroll h-full min-h-0 overflow-y-auto px-3 py-4 md:px-12"
+
+          style={{
+
+            backgroundColor: 'var(--color-app-bg)',
+
+            backgroundImage:
+
+              'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)',
+
+            backgroundSize: '22px 22px',
+
+            overflowAnchor: 'none',
+
+            overscrollBehavior: 'contain',
+
+            touchAction: 'pan-y pinch-zoom',
+
+          }}
+
+        >
 
         {showInitialLoading ? (
 
@@ -1062,39 +1118,21 @@ export default function ChatView({
 
         )}
 
-      </div>
+        </div>
+
+      </section>
 
 
+
+      <section className="chat-composer-pane" aria-label="Message composer">
 
       {actionError && (
 
-        <p className="border-t border-black/30 bg-[var(--color-panel)] px-3 py-1.5 text-xs text-red-400">
+        <p className="border-b border-black/30 px-3 py-1.5 text-xs text-red-400">
 
           {actionError}
 
         </p>
-
-      )}
-
-
-
-      {messageMenu && (
-
-        <MessageActionMenu
-
-          menu={messageMenu}
-
-          onReply={() => {
-
-            setReplyTo(replyTargetFromMessage(messageMenu.message));
-
-            setMessageMenu(null);
-
-          }}
-
-          onDelete={() => void handleDeleteMessage(messageMenu.message)}
-
-        />
 
       )}
 
@@ -1121,6 +1159,30 @@ export default function ChatView({
         onMessageCreated={onMessageCreated}
 
       />
+
+      </section>
+
+
+
+      {messageMenu && (
+
+        <MessageActionMenu
+
+          menu={messageMenu}
+
+          onReply={() => {
+
+            setReplyTo(replyTargetFromMessage(messageMenu.message));
+
+            setMessageMenu(null);
+
+          }}
+
+          onDelete={() => void handleDeleteMessage(messageMenu.message)}
+
+        />
+
+      )}
 
 
 

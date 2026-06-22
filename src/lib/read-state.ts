@@ -188,6 +188,39 @@ export function countUnreadMessages(
   }).length;
 }
 
+/** First unread message from others (messages must be sorted oldest-first). */
+export function findFirstUnreadMessage(
+  messages: MessageModel[],
+  lastReadAt: string | null,
+  myUsername: string,
+  mySub: string,
+  subToUsername: Map<string, string>,
+  handleToSub: Map<string, string>,
+): MessageModel | null {
+  for (const message of messages) {
+    if (
+      isMessageFromSelf(
+        message.senderUsername,
+        myUsername,
+        mySub,
+        subToUsername,
+        handleToSub,
+        {
+          isGroup: (message.participantUsernames?.length ?? 0) > 2,
+          participants: message.participantUsernames ?? [],
+        },
+      )
+    ) {
+      continue;
+    }
+    if (!message.createdAt) continue;
+    if (!isReadThrough(lastReadAt, message.createdAt)) {
+      return message;
+    }
+  }
+  return null;
+}
+
 /** Newest unread message from others (messages must be sorted oldest-first). */
 export function findLastUnreadMessage(
   messages: MessageModel[],

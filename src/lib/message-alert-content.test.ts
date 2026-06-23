@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMAIL_FROM_DISPLAY_NAME,
+  DEFAULT_EMAIL_FROM_DISPLAY_NAME,
   buildMessageAlertEmail,
   buildMessengerDeepLink,
   formatSesFromAddress,
@@ -26,7 +26,7 @@ describe('message-alert-content', () => {
 
   it('formats SES from address with service display name', () => {
     expect(formatSesFromAddress('alerts@example.com')).toBe(
-      `"${EMAIL_FROM_DISPLAY_NAME}" <alerts@example.com>`,
+      `"${DEFAULT_EMAIL_FROM_DISPLAY_NAME}" <alerts@example.com>`,
     );
   });
 
@@ -39,7 +39,7 @@ describe('message-alert-content', () => {
     expect(email.textBody).toContain('new message from lena');
     expect(email.textBody).toContain(link);
     expect(email.textBody).toContain('Do not reply');
-    expect(email.textBody).toContain(EMAIL_FROM_DISPLAY_NAME);
+    expect(email.textBody).toContain(DEFAULT_EMAIL_FROM_DISPLAY_NAME);
     expect(email.htmlBody).toContain(`href="${link}"`);
     expect(email.htmlBody).toContain('Do not reply');
   });

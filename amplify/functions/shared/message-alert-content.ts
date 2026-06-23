@@ -1,4 +1,9 @@
-export const EMAIL_FROM_DISPLAY_NAME = 'Private Messenger Service';
+export const DEFAULT_EMAIL_FROM_DISPLAY_NAME = 'Private Messenger Service';
+
+export function resolveEmailFromDisplayName(): string {
+  const fromEnv = process.env.MESSENGER_FROM_DISPLAY_NAME?.trim();
+  return fromEnv || DEFAULT_EMAIL_FROM_DISPLAY_NAME;
+}
 
 export function resolveMessengerAppUrl(appUrl?: string | null): string {
   const fromArg = appUrl?.trim();
@@ -25,7 +30,7 @@ export function formatSesFromAddress(fromEmail: string): string {
   const email = fromEmail.trim();
   if (!email) return email;
   if (email.includes('<') && email.includes('>')) return email;
-  return `"${EMAIL_FROM_DISPLAY_NAME}" <${email}>`;
+  return `"${resolveEmailFromDisplayName()}" <${email}>`;
 }
 
 export function buildMessageAlertEmail(input: {
@@ -47,7 +52,7 @@ export function buildMessageAlertEmail(input: {
     '',
     '---',
     'Do not reply to this email. This mailbox is not monitored.',
-    `Sent by ${EMAIL_FROM_DISPLAY_NAME}.`,
+    `Sent by ${resolveEmailFromDisplayName()}.`,
   ].join('\n');
 
   const htmlBody = [
@@ -57,7 +62,7 @@ export function buildMessageAlertEmail(input: {
     '<hr>',
     '<p style="color:#666;font-size:12px;">',
     '<strong>Do not reply</strong> to this email. This mailbox is not monitored.<br>',
-    `Sent by ${EMAIL_FROM_DISPLAY_NAME}.`,
+    `Sent by ${resolveEmailFromDisplayName()}.`,
     '</p>',
   ].join('');
 

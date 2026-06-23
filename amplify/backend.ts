@@ -11,6 +11,8 @@ import { messageAlerts } from './functions/message-alerts/resource';
 import { profileSync } from './functions/profile-sync/resource';
 import { readCursor } from './functions/read-cursor/resource';
 
+// Backend deploy region: us-east-2 (see amplify/deployment-region.ts and amplify.yml).
+
 const backend = defineBackend({
   auth,
   data,
@@ -69,6 +71,10 @@ backend.messageAlerts.addEnvironment('USER_POOL_ID', poolId);
 backend.messageAlerts.addEnvironment(
   'MESSENGER_FROM_EMAIL',
   process.env.MESSENGER_FROM_EMAIL ?? '',
+);
+backend.messageAlerts.addEnvironment(
+  'MESSENGER_FROM_DISPLAY_NAME',
+  process.env.MESSENGER_FROM_DISPLAY_NAME ?? '',
 );
 backend.messageAlerts.addEnvironment(
   'MESSENGER_APP_URL',

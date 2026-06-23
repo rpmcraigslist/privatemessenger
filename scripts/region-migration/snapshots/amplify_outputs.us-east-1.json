@@ -1,0 +1,13 @@
+{
+  "auth": {
+    "user_pool_id": "us-east-1_vepqFxsh9",
+    "aws_region": "us-east-1"
+  },
+  "data": {
+    "aws_region": "us-east-1"
+  },
+  "storage": {
+    "bucket_name": "amplify-privatemessenger--messengerattachmentsbuck-kburuxyveeho",
+    "aws_region": "us-east-1"
+  }
+}

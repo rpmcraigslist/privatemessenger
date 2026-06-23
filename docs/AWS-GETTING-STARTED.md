@@ -17,7 +17,7 @@ This project uses **AWS Amplify Gen 2** — TypeScript-defined backend (`amplify
 | ------ | ----- |
 | Access Key ID | From IAM |
 | Secret Access Key | From IAM (save once) |
-| Region | e.g. `us-east-1` (must match where you deploy) |
+| Region | **`us-east-2`** (Ohio — must match Amplify app, backend, and SES) |
 | Output | `json` |
 
 ---
@@ -131,7 +131,44 @@ Both must run for full-stack local dev.
 
 ---
 
-## DynamoDB access patterns
+## Deployment region (one region for everything)
+
+This project deploys **all backend resources** to **`us-east-2` (Ohio)** — the same region as the Amplify Hosting app.
+
+| Where | Region |
+| ----- | ------ |
+| Amplify Console app | `us-east-2` |
+| Cognito, AppSync, DynamoDB, Lambda, S3 | `us-east-2` (via `amplify.yml` + local `AWS_REGION`) |
+| Amazon SES (email alerts) | **`us-east-2`** — same as the `message-alerts` Lambda |
+
+The canonical constant is `amplify/deployment-region.ts`. CI sets `AWS_REGION=us-east-2` before `ampx pipeline-deploy`.
+
+**Local sandbox** — set region before starting sandbox so you don't create a duplicate backend in another region:
+
+```bash
+# PowerShell
+$env:AWS_REGION = "us-east-2"
+npm run sandbox
+
+# bash
+export AWS_REGION=us-east-2
+npm run sandbox
+```
+
+After deploy, confirm in the build log or in `amplify_outputs.json`: every `aws_region` field should read `us-east-2`.
+
+> **Note:** The copy of `amplify_outputs.json` in git may still show `us-east-1` if it was generated from an old sandbox. Production uses the file written during the Amplify build. After the next deploy, commit the updated outputs if you track them in git.
+
+### Email alerts (SES)
+
+1. **Amplify Console** (Ohio) → your app → **Hosting** → **Environment variables** → set `MESSENGER_FROM_EMAIL` (and optional `MESSENGER_APP_URL`).
+2. **Redeploy** `main` so the backend phase runs.
+3. **Amazon SES** in **`us-east-2`**: https://us-east-2.console.aws.amazon.com/ses/home?region=us-east-2#/account  
+   - Verify the **sender** address (same as `MESSENGER_FROM_EMAIL`).  
+   - In **sandbox**, also verify each **recipient** contact email (e.g. `rmecham@posteo.com`).
+4. CloudWatch → **Lambda** → `message-alerts` → confirm logs show `fromEmailConfigured: true` and `email sent`, not `email skipped`.
+
+---
 
 | Need | Pattern |
 | ---- | ------- |
@@ -163,7 +200,8 @@ npm run docker:dev                              # UI → real sandbox APIs
 ### CDK bootstrap / `ssm:GetParameter` denied
 
 ```bash
-npx aws-cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
+npx aws-cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-2
+export AWS_REGION=us-east-2   # or $env:AWS_REGION = "us-east-2" on PowerShell
 npm run sandbox
 ```
 

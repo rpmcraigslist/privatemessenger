@@ -14,6 +14,9 @@ backend:
           else
             echo "MESSENGER_FROM_EMAIL is set for this deploy."
           fi
+        - export AWS_REGION=us-east-2
+        - export AWS_DEFAULT_REGION=us-east-2
+        - echo "Deploying backend to AWS region $AWS_REGION (must match Amplify app + SES)"
         - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
 frontend:
   phases:

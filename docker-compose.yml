@@ -39,7 +39,7 @@ services:
       - ${AWS_CREDENTIALS_DIR:-${USERPROFILE}/.aws}:/root/.aws:ro
     environment:
       AWS_PROFILE: ${AWS_PROFILE:-default}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_REGION: ${AWS_REGION:-us-east-2}
     command: npm run sandbox
 
   web-prod:

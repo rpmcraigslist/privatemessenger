@@ -1,15 +1,12 @@
 #!/usr/bin/env tsx
 /**
  * Ensures the CDK assets bucket exists in the deploy region before ampx pipeline-deploy.
- * If CDKToolkit is stale (stack exists but bucket was deleted during cleanup), deletes
- * CDKToolkit and re-bootstraps Ohio.
+ *
+ * Amplify's build role cannot delete IAM roles, so this script never deletes CDKToolkit.
+ * If the bucket is missing it only runs `cdk bootstrap --force` and fails with a clear
+ * message when manual admin cleanup is required (e.g. CDKToolkit stuck in DELETE_FAILED).
  */
-import {
-  CloudFormationClient,
-  DescribeStacksCommand,
-  DeleteStackCommand,
-  waitUntilStackDeleteComplete,
-} from '@aws-sdk/client-cloudformation';
+import { DescribeStacksCommand, CloudFormationClient } from '@aws-sdk/client-cloudformation';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import { execSync } from 'node:child_process';
@@ -30,38 +27,27 @@ async function bucketExists(bucket: string): Promise<boolean> {
   }
 }
 
-async function cdkToolkitStackExists(): Promise<boolean> {
+async function cdkToolkitStackStatus(): Promise<string | null> {
   const cfn = new CloudFormationClient({ region: DEPLOY_REGION });
   try {
     const result = await cfn.send(
       new DescribeStacksCommand({ StackName: CDK_TOOLKIT_STACK }),
     );
-    const status = result.Stacks?.[0]?.StackStatus;
-    return status !== undefined && !status.includes('DELETE');
+    return result.Stacks?.[0]?.StackStatus ?? null;
   } catch (err: unknown) {
     const name = (err as { name?: string }).name;
     if (name === 'ValidationError' || name === 'ResourceNotFoundException') {
-      return false;
+      return null;
     }
     throw err;
   }
 }
 
-async function deleteStaleCdkToolkit(): Promise<void> {
-  console.log(`Deleting stale ${CDK_TOOLKIT_STACK} stack in ${DEPLOY_REGION}…`);
-  const cfn = new CloudFormationClient({ region: DEPLOY_REGION });
-  await cfn.send(new DeleteStackCommand({ StackName: CDK_TOOLKIT_STACK }));
-  await waitUntilStackDeleteComplete(
-    { client: cfn, maxWaitTime: 600 },
-    { StackName: CDK_TOOLKIT_STACK },
-  );
-  console.log(`${CDK_TOOLKIT_STACK} deleted.`);
-}
-
-function bootstrapCdk(accountId: string): void {
+function bootstrapCdk(accountId: string, force: boolean): void {
   const target = `aws://${accountId}/${DEPLOY_REGION}`;
-  console.log(`Bootstrapping CDK in ${target}…`);
-  execSync(`npx aws-cdk bootstrap ${target}`, {
+  const forceFlag = force ? ' --force' : '';
+  console.log(`Bootstrapping CDK in ${target}${force ? ' (force)' : ''}…`);
+  execSync(`npx aws-cdk bootstrap ${target}${forceFlag}`, {
     stdio: 'inherit',
     env: process.env,
   });
@@ -85,18 +71,22 @@ async function main(): Promise<void> {
 
   console.warn(`CDK assets bucket missing: ${bucket}`);
 
-  if (await cdkToolkitStackExists()) {
-    console.warn(
-      `${CDK_TOOLKIT_STACK} exists but assets bucket is gone — likely deleted during cleanup.`,
+  const stackStatus = await cdkToolkitStackStatus();
+  if (stackStatus === 'DELETE_FAILED') {
+    throw new Error(
+      `${CDK_TOOLKIT_STACK} is DELETE_FAILED in ${DEPLOY_REGION}. ` +
+        'Amplify cannot repair this (no iam:DeleteRolePolicy). ' +
+        'From an admin shell: aws cloudformation delete-stack --stack-name CDKToolkit --region us-east-2, ' +
+        'wait for delete, then npx aws-cdk bootstrap aws://ACCOUNT/us-east-2',
     );
-    await deleteStaleCdkToolkit();
   }
 
-  bootstrapCdk(accountId);
+  bootstrapCdk(accountId, stackStatus !== null);
 
   if (!(await bucketExists(bucket))) {
     throw new Error(
-      `CDK bootstrap finished but bucket ${bucket} is still missing. Check IAM permissions and S3 in ${DEPLOY_REGION}.`,
+      `CDK bootstrap finished but bucket ${bucket} is still missing. ` +
+        `Check CDKToolkit in ${DEPLOY_REGION} and S3 permissions.`,
     );
   }
 

@@ -8,6 +8,12 @@ backend:
         - npm run typecheck
         - npm run typecheck:backend
         - npm run test
+        - |
+          if [ -z "$MESSENGER_FROM_EMAIL" ]; then
+            echo "WARNING: MESSENGER_FROM_EMAIL is not set — email alerts will be skipped at runtime."
+          else
+            echo "MESSENGER_FROM_EMAIL is set for this deploy."
+          fi
         - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
 frontend:
   phases:

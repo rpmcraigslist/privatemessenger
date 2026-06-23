@@ -142,8 +142,9 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
             placeholder="you@example.com"
           />
           <p className="text-xs text-[var(--color-muted)]">
-            When saved, new messages can email you &quot;You&apos;ve got a new
-            message&quot; with a link to sign in and open the conversation.
+            When saved, new messages email you from {`Private Messenger Service`}
+            with a link to open that message. Do not reply to those emails — they
+            are sent automatically.
           </p>
 
           {isNotificationSupported() && (

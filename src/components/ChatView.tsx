@@ -567,7 +567,7 @@ export default function ChatView({
     if (focusMessageId) {
       positioned = scrollToMessage(focusMessageId, {
         flash: true,
-        block: 'center',
+        block: 'start',
         behavior: 'instant',
       });
       if (positioned) {

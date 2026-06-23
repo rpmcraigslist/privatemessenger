@@ -9,6 +9,7 @@ import { isCognitoUuid, resolveCallerIdentity } from '../shared/cognito';
 import {
   buildMessageAlertEmail,
   buildMessengerDeepLink,
+  formatSesFromAddress,
   resolveMessengerAppUrl,
 } from '../shared/message-alert-content';
 import {
@@ -63,17 +64,21 @@ async function loadMessage(
 async function sendEmailAlert(
   toAddress: string,
   openUrl: string,
+  senderName: string,
 ): Promise<void> {
   const from = fromEmailAddress();
   if (!from) {
     throw new Error('MESSENGER_FROM_EMAIL is not configured');
   }
 
-  const { subject, textBody, htmlBody } = buildMessageAlertEmail({ openUrl });
+  const { subject, textBody, htmlBody } = buildMessageAlertEmail({
+    openUrl,
+    senderName,
+  });
 
   await ses.send(
     new SendEmailCommand({
-      Source: from,
+      Source: formatSesFromAddress(from),
       Destination: { ToAddresses: [toAddress] },
       Message: {
         Subject: { Data: subject, Charset: 'UTF-8' },
@@ -124,7 +129,7 @@ export const handler: Handler = async (event) => {
 
     if (emailTarget && fromEmail) {
       try {
-        await sendEmailAlert(emailTarget.email, openUrl);
+        await sendEmailAlert(emailTarget.email, openUrl, senderName);
         sent++;
         console.info('sendMessageAlerts: email sent', {
           participantId,

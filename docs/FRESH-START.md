@@ -93,6 +93,12 @@ Stack delete does **not** always remove buckets. Check:
 - [S3 us-east-1](https://s3.console.aws.amazon.com/s3/buckets?region=us-east-1)
 - [S3 us-east-2](https://s3.console.aws.amazon.com/s3/buckets?region=us-east-2)
 
+**Keep (do not delete):**
+
+- `cdk-hnb659fds-assets-*` — **required for every deploy** (CDK staging; schema/Lambda zips)
+- `CDKToolkit` CloudFormation stack
+- After 1.4 deploy succeeds: the **current** `*messengerattachments*` bucket for the live stack
+
 **Usually safe to delete** (empty first, then delete bucket):
 
 - `*messengerattachments*`
@@ -100,6 +106,8 @@ Stack delete does **not** always remove buckets. Check:
 - Old `amplify-d332i3bk71so1w-*` **deployment** buckets from deleted stacks
 
 **Keep:** `cdk-hnb659fds-assets-*` (CDKToolkit). After 1.4 deploy succeeds, keep the **current** attachments bucket the new stack created.
+
+**Never delete `cdk-hnb659fds-assets-*`.** Deploy will fail with “schema from S3 / NoSuchBucket” without it.
 
 List suspects locally:
 
@@ -122,14 +130,24 @@ Ignore `npm run migrate:*` for fresh start.
 
 ---
 
-## CDK bootstrap (only if deploy fails)
+## CDK bootstrap (required if deploy says NoSuchBucket / schema from S3)
+
+If Amplify build fails with **“Error retrieving the schema from S3”** or **NoSuchBucket**, the **CDK assets bucket** is missing. That often happens if `cdk-hnb659fds-assets-*` was deleted during cleanup while **CDKToolkit** still exists.
+
+**Never delete:** `cdk-hnb659fds-assets-*` — every deploy uploads Lambda code and GraphQL schema there.
+
+Fix (Ohio):
 
 ```powershell
-aws sts get-caller-identity --profile personal-admin
-npx aws-cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-2 --profile personal-admin
+$env:AWS_PROFILE = "personal-admin"
+$env:AWS_REGION = "us-east-2"
+aws sts get-caller-identity
+npx aws-cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-2
 ```
 
-Then redeploy `main`.
+Confirm in [S3 Ohio](https://s3.console.aws.amazon.com/s3/buckets?region=us-east-2) that `cdk-hnb659fds-assets-ACCOUNTID-us-east-2` exists.
+
+Then **Amplify → Redeploy `main`**.
 
 ## Local sandbox (optional)
 

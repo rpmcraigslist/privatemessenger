@@ -476,6 +476,8 @@ export default function AuthGate({ children }: Props) {
 
           onChange={setPassword}
 
+          showPasswordToggle
+
         />
 
         {error && <p className="text-sm text-red-400">{error}</p>}

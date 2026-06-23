@@ -59,6 +59,7 @@ type NoSaveFieldProps = {
   inputMode?: 'text' | 'tel' | 'email';
   placeholder?: string;
   className?: string;
+  showPasswordToggle?: boolean;
 };
 
 /** Input that resists autofill and "save password?" prompts across major browsers. */
@@ -70,9 +71,11 @@ export function NoSaveField({
   inputMode,
   placeholder,
   className = 'w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 outline-none',
+  showPasswordToggle = false,
 }: NoSaveFieldProps) {
   const fieldId = useId();
   const [unlocked, setUnlocked] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const isEmail = type === 'email';
 
@@ -81,15 +84,17 @@ export function NoSaveField({
   }
 
   const inputType = isPassword
-    ? unlocked
-      ? 'password'
-      : 'text'
+    ? !unlocked
+      ? 'text'
+      : showPassword
+        ? 'text'
+        : 'password'
     : isEmail
       ? 'text'
       : type;
   const resolvedInputMode = inputMode ?? (isEmail ? 'email' : undefined);
   const maskedTextStyle: CSSProperties | undefined =
-    isPassword && !unlocked
+    isPassword && !unlocked && !showPassword
       ? ({ WebkitTextSecurity: 'disc' } as CSSProperties)
       : undefined;
 
@@ -125,9 +130,32 @@ export function NoSaveField({
   if (!label) return input;
 
   return (
-    <label className="block" htmlFor={fieldId}>
-      <span className="mb-1 block text-sm text-[var(--color-muted)]">{label}</span>
+    <div className="block">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label className="text-sm text-[var(--color-muted)]" htmlFor={fieldId}>
+          {label}
+        </label>
+        {isPassword && showPasswordToggle && (
+          <label
+            className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--color-muted)]"
+            htmlFor={`${fieldId}-show-password`}
+          >
+            <input
+              id={`${fieldId}-show-password`}
+              type="checkbox"
+              checked={showPassword}
+              onChange={(e) => {
+                const visible = e.target.checked;
+                setShowPassword(visible);
+                if (visible) setUnlocked(true);
+              }}
+              className="rounded"
+            />
+            Show password
+          </label>
+        )}
+      </div>
       {input}
-    </label>
+    </div>
   );
 }

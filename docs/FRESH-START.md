@@ -130,9 +130,11 @@ Ignore `npm run migrate:*` for fresh start.
 
 ---
 
-## CDK bootstrap (required if deploy says NoSuchBucket / schema from S3)
+## CDK bootstrap (required if deploy fails on asset publish / schema from S3)
 
-If Amplify build fails with **“Error retrieving the schema from S3”** or **NoSuchBucket**, the **CDK assets bucket** is missing. That often happens if `cdk-hnb659fds-assets-*` was deleted during cleanup while **CDKToolkit** still exists.
+If Amplify build fails with **“Failed to build asset … Templateresolvers”**, **“Error retrieving the schema from S3”**, or **NoSuchBucket**, the **CDK assets bucket** is missing. That often happens if `cdk-hnb659fds-assets-*` was deleted during cleanup while **CDKToolkit** still exists.
+
+Running `npx aws-cdk bootstrap` alone will print **“no changes”** and **will not recreate the bucket** — CloudFormation still thinks the bucket exists.
 
 **Never delete:** `cdk-hnb659fds-assets-*` — every deploy uploads Lambda code and GraphQL schema there.
 
@@ -142,6 +144,11 @@ Fix (Ohio):
 $env:AWS_PROFILE = "personal-admin"
 $env:AWS_REGION = "us-east-2"
 aws sts get-caller-identity
+
+# If S3 Ohio shows zero buckets (or head-bucket 404), delete the stale stack first:
+aws cloudformation delete-stack --stack-name CDKToolkit --region us-east-2
+aws cloudformation wait stack-delete-complete --stack-name CDKToolkit --region us-east-2
+
 npx aws-cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-2
 ```
 

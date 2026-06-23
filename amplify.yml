@@ -17,6 +17,14 @@ backend:
         - export AWS_REGION=us-east-2
         - export AWS_DEFAULT_REGION=us-east-2
         - echo "Deploying backend to AWS region $AWS_REGION (must match Amplify app + SES)"
+        - |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="cdk-hnb659fds-assets-${ACCOUNT}-us-east-2"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "ERROR: CDK assets bucket $BUCKET is missing. Delete stale CDKToolkit stack and re-bootstrap Ohio before redeploying."
+            exit 1
+          fi
+          echo "CDK assets bucket OK: $BUCKET"
         - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
         - test -f amplify_outputs.json && cp amplify_outputs.json public/amplify_outputs.json
         - node -e "const o=require('./amplify_outputs.json'); console.log('Backend outputs region:', o.auth?.aws_region)"

@@ -4,4 +4,5 @@ export const profileSync = defineFunction({
   name: 'profile-sync',
   resourceGroupName: 'data',
   entry: './handler.ts',
+  timeoutSeconds: 30,
 });

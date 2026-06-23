@@ -4,4 +4,5 @@ import { defineFunction } from '@aws-amplify/backend';
 export const attachmentUrl = defineFunction({
   name: 'attachment-url',
   resourceGroupName: 'data',
+  timeoutSeconds: 15,
 });

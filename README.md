@@ -10,7 +10,7 @@ It uses **AWS Amplify Gen 2** (code-first backend under `amplify/`, CLI is `ampx
 | API (real-time) | AWS AppSync (GraphQL + WebSockets)       | 4M operations/month                         |
 | Database        | Amazon DynamoDB (on-demand)              | 25 GB storage                               |
 | File storage    | Amazon S3                                | 5 GB, 2,000 PUT, 20,000 GET                 |
-| SMS alerts      | Amazon SNS                                 | Pay per message (optional; user opt-in)     |
+| Email alerts      | Amazon SES (via Lambda)                  | Verify sender in **us-east-2**; optional SMS still via SNS |
 | Web hosting     | Amazon S3 + CloudFront (Amplify Hosting) | 1 TB CloudFront data transfer out           |
 | Frontend        | React + Vite + TypeScript + Tailwind CSS | free (your code)                            |
 
@@ -23,7 +23,7 @@ It uses **AWS Amplify Gen 2** (code-first backend under `amplify/`, CLI is `ampx
 - **Temporary passwords** — new users must set a new password on first sign-in (`CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED`).
 - **1:1 and group chat** with real-time delivery (AppSync `observeQuery` subscriptions).
 - **Attachments** — images/files in S3; other participants download via the `getAttachmentUrl` Lambda (membership checked).
-- **Optional SMS** — if a user saves an E.164 phone number, new messages can trigger SNS texts (`sendMessageAlerts`).
+- **Email alerts** — if a user saves a **contact email** in Profile, new messages send a one-way notification via **Amazon SES** (`sendMessageAlerts`) with a link to open the chat. Optional SMS via SNS if a phone number is saved.
 - **Dark mobile-first UI** and an installable **PWA** shell (offline app shell only — messaging requires network).
 
 **Not included:** forgot-password flow, email verification UX, TOTP MFA (disabled in pool config), message edit/delete, read receipts, or push notifications (FCM).
@@ -78,6 +78,8 @@ See `docs/AWS-GETTING-STARTED.md` for architecture notes and troubleshooting. Se
 
 ## 2. Deploy for others (Amplify Hosting)
 
+**Region:** everything deploys to **us-east-2 (Ohio)** — Amplify app, backend, and SES. See `docs/FRESH-START.md` if you reset AWS from scratch.
+
 Recommended path: connect GitHub to **Amplify Hosting**. The repo’s `amplify.yml` runs backend + frontend on each push.
 
 1. Push this repo to GitHub.
@@ -127,7 +129,7 @@ amplify/
     bootstrap-admin/           # create first admin (API key auth)
     admin-ops/                 # user CRUD, clear messages, listUserDirectory
     profile-sync/              # syncMyProfile on login, repair legacy participant ids
-    message-alerts/            # optional SNS SMS on new messages
+    message-alerts/            # SES email (+ optional SNS SMS) on new messages
     attachment-url/            # presigned download URLs
     pre-sign-up/               # auto-confirm trigger
 src/
@@ -142,6 +144,7 @@ amplify.yml                    # Amplify Hosting build spec
 docs/
   ARCHITECTURE.md            # service map, diagrams, workflows
   AWS-GETTING-STARTED.md     # account setup, deploy, troubleshooting
+  FRESH-START.md             # one-region reset after cleanup (v1.4+)
 ```
 
 ---

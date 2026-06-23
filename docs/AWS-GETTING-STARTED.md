@@ -170,6 +170,8 @@ After deploy, confirm in the build log or in `amplify_outputs.json`: every `aws_
 
 ---
 
+## DynamoDB access patterns
+
 | Need | Pattern |
 | ---- | ------- |
 | My conversations | AppSync owner auth: `participants` contains my `sub` |

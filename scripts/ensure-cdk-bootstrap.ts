@@ -1,10 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Ensures the CDK assets bucket exists in the deploy region before ampx pipeline-deploy.
+ * Local/admin helper: verify CDK bootstrap in Ohio, or repair when bucket is truly missing.
+ * Do NOT run from amplify.yml — the Amplify build role cannot s3:HeadBucket on the CDK
+ * assets bucket (false "missing" errors) and cannot delete CDKToolkit IAM resources.
  *
- * Amplify's build role cannot delete IAM roles, so this script never deletes CDKToolkit.
- * If the bucket is missing it only runs `cdk bootstrap --force` and fails with a clear
- * message when manual admin cleanup is required (e.g. CDKToolkit stuck in DELETE_FAILED).
+ * Usage (admin credentials):
+ *   $env:AWS_PROFILE = "personal-admin"
+ *   $env:AWS_REGION = "us-east-2"
+ *   npm run ensure:cdk-bootstrap
  */
 import { DescribeStacksCommand, CloudFormationClient } from '@aws-sdk/client-cloudformation';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';

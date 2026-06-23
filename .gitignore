@@ -8,6 +8,7 @@ dev-dist/
 # amplify build artifacts
 .amplify/
 amplifyconfiguration*.json
+public/amplify_outputs.json
 # NOTE: amplify_outputs.json is intentionally tracked. It holds public client
 # config (no secrets) and a placeholder is committed so the app builds pre-deploy.
 # `ampx sandbox` / the deploy pipeline overwrites it with your real resource IDs.

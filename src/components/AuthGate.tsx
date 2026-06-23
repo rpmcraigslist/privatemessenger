@@ -85,9 +85,7 @@ export default function AuthGate({ children }: Props) {
           console.error('bootstrapRequired failed', errors);
 
           setError(
-
-            'Could not check setup status. Redeploy the sandbox and refresh.',
-
+            'Could not check setup status. Confirm the Amplify main build succeeded, then hard-refresh or clear site data.',
           );
 
           setMode('signIn');
@@ -113,9 +111,7 @@ export default function AuthGate({ children }: Props) {
         console.error('auth gate init failed', err);
 
         setError(
-
-          'Could not reach the backend. Confirm sandbox deploy finished, then refresh.',
-
+          'Could not reach the backend. Confirm the Amplify deploy finished in us-east-2, then hard-refresh or clear site data.',
         );
 
         setMode('signIn');

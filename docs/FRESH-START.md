@@ -86,6 +86,30 @@ Delete parent stack `amplify-privatemessenger-*` (not only `-auth` nested). Empt
 
 Delete parent `amplify-d332i3bk71so1w-main-branch-*` before fresh deploy. Leave **CDKToolkit**.
 
+### S3 orphans (CloudFormation often leaves these)
+
+Stack delete does **not** always remove buckets. Check:
+
+- [S3 us-east-1](https://s3.console.aws.amazon.com/s3/buckets?region=us-east-1)
+- [S3 us-east-2](https://s3.console.aws.amazon.com/s3/buckets?region=us-east-2)
+
+**Usually safe to delete** (empty first, then delete bucket):
+
+- `*messengerattachments*`
+- `amplify-privatemessenger*`
+- Old `amplify-d332i3bk71so1w-*` **deployment** buckets from deleted stacks
+
+**Keep:** `cdk-hnb659fds-assets-*` (CDKToolkit). After 1.4 deploy succeeds, keep the **current** attachments bucket the new stack created.
+
+List suspects locally:
+
+```powershell
+$env:AWS_PROFILE = "personal-admin"
+npm run cleanup:list-s3
+```
+
+Console: bucket → **Empty** → **Delete bucket**.
+
 </details>
 
 Local migration export (optional delete):

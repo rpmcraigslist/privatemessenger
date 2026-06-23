@@ -1,7 +1,7 @@
 {
   "name": "private-messenger",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "description": "Real-time, mobile-first messenger PWA on AWS (Cognito + AppSync + DynamoDB + S3) using Amplify Gen 2.",
   "engines": {
@@ -22,6 +22,7 @@
     "migrate:export": "tsx scripts/region-migration/export.ts",
     "migrate:import": "tsx scripts/region-migration/import.ts",
     "migrate:teardown": "tsx scripts/region-migration/teardown.ts",
+    "cleanup:list-s3": "tsx scripts/cleanup-orphan-s3.ts",
     "docker:dev": "docker compose up web",
     "docker:local": "docker compose -f docker-compose.local.yml up",
     "docker:aws": "docker compose --profile aws up",

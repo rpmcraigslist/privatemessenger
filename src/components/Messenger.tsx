@@ -338,7 +338,7 @@ export default function Messenger({ onSignOut }: Props) {
 
             ? err.message
 
-            : 'Could not load your profile. Try again or redeploy the sandbox.';
+            : 'Could not load your profile. Try again or hard-refresh after deploy.';
 
         setBootError(message);
 

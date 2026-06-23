@@ -1,5 +1,6 @@
 import {
   DynamoDBClient,
+  ListTablesCommand,
 } from '@aws-sdk/client-dynamodb';
 import {
   BatchWriteCommand,
@@ -8,6 +9,80 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import type { ExportedTable, ModelName } from './types.js';
 import { MODEL_TABLE_HINTS } from './types.js';
+
+const MODELS_LONGEST_FIRST = [...MODEL_TABLE_HINTS].sort(
+  (a, b) => b.length - a.length,
+);
+
+/** e.g. Conversation-bt5oxhvn6fe3jg3m44tbltr4sq-NONE */
+export function apiIdFromAmplifyTableName(tableName: string): string | null {
+  const match = tableName.match(/^[A-Za-z]+-([a-z0-9]+)-NONE$/i);
+  return match?.[1] ?? null;
+}
+
+export function matchModelFromAmplifyTableName(tableName: string): ModelName | null {
+  for (const model of MODELS_LONGEST_FIRST) {
+    if (tableName.startsWith(`${model}-`)) return model;
+  }
+  return null;
+}
+
+export async function listAllTableNames(region: string): Promise<string[]> {
+  const client = new DynamoDBClient({ region });
+  const names: string[] = [];
+  let startName: string | undefined;
+
+  do {
+    const page = await client.send(
+      new ListTablesCommand({ ExclusiveStartTableName: startName }),
+    );
+    names.push(...(page.TableNames ?? []));
+    startName = page.LastEvaluatedTableName;
+  } while (startName);
+
+  return names;
+}
+
+/** Group Amplify Gen 2 tables by shared API id hash in the table name. */
+export function discoverTablesByApiIdGrouping(
+  allTableNames: string[],
+  preferredApiId?: string | null,
+): Partial<Record<ModelName, string>> {
+  const byApiId = new Map<string, Partial<Record<ModelName, string>>>();
+
+  for (const name of allTableNames) {
+    const model = matchModelFromAmplifyTableName(name);
+    const apiId = apiIdFromAmplifyTableName(name);
+    if (!model || !apiId) continue;
+    if (!byApiId.has(apiId)) byApiId.set(apiId, {});
+    const group = byApiId.get(apiId)!;
+    if (!group[model]) group[model] = name;
+  }
+
+  if (preferredApiId && byApiId.has(preferredApiId)) {
+    return byApiId.get(preferredApiId)!;
+  }
+
+  let best: Partial<Record<ModelName, string>> = {};
+  let bestScore = 0;
+  let bestApiId: string | null = null;
+
+  for (const [apiId, group] of byApiId.entries()) {
+    const score = MODEL_TABLE_HINTS.filter((model) => group[model]).length;
+    const winsTie =
+      score === bestScore &&
+      preferredApiId &&
+      apiId === preferredApiId &&
+      bestApiId !== preferredApiId;
+    if (score > bestScore || winsTie) {
+      bestScore = score;
+      best = group;
+      bestApiId = apiId;
+    }
+  }
+
+  return best;
+}
 
 function docClient(region: string): DynamoDBDocumentClient {
   return DynamoDBDocumentClient.from(new DynamoDBClient({ region }), {
@@ -46,9 +121,7 @@ export async function exportTables(
   const exported: ExportedTable[] = [];
   for (const model of MODEL_TABLE_HINTS) {
     const tableName = tables[model];
-    if (!tableName) {
-      throw new Error(`Missing DynamoDB table for model ${model}`);
-    }
+    if (!tableName) continue;
     const items = await scanTable(region, tableName);
     exported.push({ model, tableName, items });
   }

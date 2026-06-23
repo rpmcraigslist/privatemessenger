@@ -77,7 +77,17 @@ async function main(): Promise<void> {
       resolve(exportDir, `${model}.json`),
     );
     const tableName = destBackend.tables[model];
-    if (!tableName) throw new Error(`Missing destination table for ${model}`);
+    if (!tableName) {
+      if (sourceItems.length === 0) {
+        console.warn(`  ${model}: skipped (no destination table, empty export)`);
+        continue;
+      }
+      throw new Error(`Missing destination table for ${model}`);
+    }
+    if (sourceItems.length === 0) {
+      console.log(`  ${model}: skipped (0 items)`);
+      continue;
+    }
 
     const remapped = sourceItems.map((item) =>
       remapItemForImport(model, item, subRemap),

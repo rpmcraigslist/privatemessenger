@@ -4,9 +4,16 @@ import { fileURLToPath } from 'node:url';
 
 export type AmplifyOutputsSnapshot = {
   auth: { user_pool_id: string; aws_region: string };
-  data: { aws_region: string };
+  data: { aws_region: string; url?: string };
   storage: { bucket_name: string; aws_region: string };
 };
+
+export function appsyncApiIdFromOutputs(outputs: AmplifyOutputsSnapshot): string | null {
+  const url = outputs.data?.url;
+  if (!url) return null;
+  const match = url.match(/https:\/\/([a-z0-9]+)\.appsync-api\./i);
+  return match?.[1] ?? null;
+}
 
 export function loadOutputs(path: string): AmplifyOutputsSnapshot {
   const raw = JSON.parse(readFileSync(path, 'utf8')) as AmplifyOutputsSnapshot;

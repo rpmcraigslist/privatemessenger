@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_EMAIL_FROM_DISPLAY_NAME,
+  buildAccountRequestAdminEmail,
   buildMessageAlertEmail,
   buildMessengerDeepLink,
   formatSesFromAddress,
@@ -42,5 +43,18 @@ describe('message-alert-content', () => {
     expect(email.textBody).toContain(DEFAULT_EMAIL_FROM_DISPLAY_NAME);
     expect(email.htmlBody).toContain(`href="${link}"`);
     expect(email.htmlBody).toContain('Do not reply');
+  });
+
+  it('builds admin account request email with claimed address', () => {
+    const email = buildAccountRequestAdminEmail({
+      requesterEmail: 'newuser@example.com',
+      appUrl: 'https://main.d332i3bk71so1w.amplifyapp.com',
+      requestedAtIso: '2026-06-23T12:00:00.000Z',
+    });
+
+    expect(email.subject).toContain('account request');
+    expect(email.textBody).toContain('newuser@example.com');
+    expect(email.textBody).toContain('create a user for them');
+    expect(email.htmlBody).toContain('newuser@example.com');
   });
 });

@@ -2,9 +2,12 @@ import {
   useId,
   useState,
   type CSSProperties,
+  type FocusEventHandler,
   type FormEventHandler,
   type ReactNode,
 } from 'react';
+
+import { scrollElementIntoComfortableView } from '../lib/visual-viewport';
 
 const DECOY_CLASS =
   'pointer-events-none absolute left-[-9999px] top-0 h-px w-px overflow-hidden opacity-0';
@@ -60,6 +63,8 @@ type NoSaveFieldProps = {
   placeholder?: string;
   className?: string;
   showPasswordToggle?: boolean;
+  /** Keep focused field visible when mobile keyboards or credential bars resize the viewport. */
+  keepInViewOnFocus?: boolean;
 };
 
 /** Input that resists autofill and "save password?" prompts across major browsers. */
@@ -72,6 +77,7 @@ export function NoSaveField({
   placeholder,
   className = 'w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2.5 outline-none',
   showPasswordToggle = false,
+  keepInViewOnFocus = false,
 }: NoSaveFieldProps) {
   const fieldId = useId();
   const [unlocked, setUnlocked] = useState(false);
@@ -82,6 +88,14 @@ export function NoSaveField({
   function unlock() {
     if (!unlocked) setUnlocked(true);
   }
+
+  const handleFocus: FocusEventHandler<HTMLInputElement> = (event) => {
+    unlock();
+    if (!keepInViewOnFocus) return;
+    const target = event.currentTarget;
+    requestAnimationFrame(() => scrollElementIntoComfortableView(target));
+    window.setTimeout(() => scrollElementIntoComfortableView(target), 120);
+  };
 
   const inputType = isPassword
     ? !unlocked
@@ -119,7 +133,7 @@ export function NoSaveField({
       data-kwimpalastatus="dead"
       data-form-type="other"
       readOnly={!unlocked}
-      onFocus={unlock}
+      onFocus={handleFocus}
       onPointerDown={unlock}
       onKeyDown={unlock}
       className={className}

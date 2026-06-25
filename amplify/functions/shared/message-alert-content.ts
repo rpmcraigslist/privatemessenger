@@ -68,3 +68,48 @@ export function buildMessageAlertEmail(input: {
 
   return { subject, textBody, htmlBody };
 }
+
+export function buildAccountRequestAdminEmail(input: {
+  requesterEmail: string;
+  appUrl: string;
+  requestedAtIso: string;
+}): { subject: string; textBody: string; htmlBody: string } {
+  const subject = 'Private Messenger — new account request';
+  const textBody = [
+    'Someone used the login page to request a new Private Messenger account.',
+    '',
+    `Claimed email address: ${input.requesterEmail}`,
+    `Requested at (UTC): ${input.requestedAtIso}`,
+    '',
+    'Next steps for you:',
+    '1. Sign in to Private Messenger as admin.',
+    '2. Open Admin and create a user for them.',
+    '3. Verify their email in Amazon SES (Ohio) if your account is still in sandbox.',
+    '4. Reply to them directly with their username and temporary password.',
+    '',
+    `App: ${input.appUrl}`,
+    '',
+    '---',
+    'Automated notice from Private Messenger.',
+  ].join('\n');
+
+  const htmlBody = [
+    '<p>Someone used the login page to request a new Private Messenger account.</p>',
+    '<ul>',
+    `<li><strong>Claimed email:</strong> ${input.requesterEmail}</li>`,
+    `<li><strong>Requested at (UTC):</strong> ${input.requestedAtIso}</li>`,
+    '</ul>',
+    '<p><strong>Next steps:</strong></p>',
+    '<ol>',
+    '<li>Sign in to Private Messenger as admin.</li>',
+    '<li>Open Admin and create a user for them.</li>',
+    '<li>Verify their email in Amazon SES (Ohio) if your account is still in sandbox.</li>',
+    '<li>Reply to them directly with their username and temporary password.</li>',
+    '</ol>',
+    `<p><a href="${input.appUrl}">${input.appUrl}</a></p>`,
+    '<hr>',
+    '<p style="color:#666;font-size:12px;">Automated notice from Private Messenger.</p>',
+  ].join('');
+
+  return { subject, textBody, htmlBody };
+}

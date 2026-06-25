@@ -11,6 +11,7 @@
     "noEmit": true,
     "paths": {
       "$amplify/*": ["../.amplify/generated/*"],
+      "$amplify/env/account-request": ["./env-stubs/function-env"],
       "$amplify/env/admin-ops": ["./env-stubs/function-env"],
       "$amplify/env/attachment-url": ["./env-stubs/function-env"],
       "$amplify/env/bootstrap-admin": ["./env-stubs/function-env"],

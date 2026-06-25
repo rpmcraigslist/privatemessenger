@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { attachmentUrl } from '../functions/attachment-url/resource';
+import { accountRequest } from '../functions/account-request/resource';
 import { bootstrapRequired } from '../functions/bootstrap-required/resource';
 import { bootstrapAdmin } from '../functions/bootstrap-admin/resource';
 import { adminOps } from '../functions/admin-ops/resource';
@@ -177,6 +178,11 @@ const schema = a
       conversationId: a.string(),
     }),
 
+    AccountRequestResult: a.customType({
+      message: a.string().required(),
+      notified: a.boolean().required(),
+    }),
+
     SyncProfileResult: a.customType({
       profileId: a.string().required(),
       username: a.string().required(),
@@ -209,6 +215,16 @@ const schema = a
       .returns(a.ref('BootstrapResult'))
       .authorization((allow) => [allow.publicApiKey()])
       .handler(a.handler.function(bootstrapAdmin)),
+
+    requestAccountAccess: a
+      .mutation()
+      .arguments({
+        contactEmail: a.string().required(),
+        appUrl: a.string(),
+      })
+      .returns(a.ref('AccountRequestResult'))
+      .authorization((allow) => [allow.publicApiKey()])
+      .handler(a.handler.function(accountRequest)),
 
     listUserDirectory: a
       .query()
@@ -342,6 +358,7 @@ const schema = a
     allow.resource(attachmentUrl),
     allow.resource(bootstrapRequired),
     allow.resource(bootstrapAdmin),
+    allow.resource(accountRequest),
     allow.resource(adminOps),
     allow.resource(messageAlerts),
     allow.resource(profileSync),

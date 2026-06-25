@@ -3,6 +3,7 @@ import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
+import { accountRequest } from './functions/account-request/resource';
 import { attachmentUrl } from './functions/attachment-url/resource';
 import { bootstrapRequired } from './functions/bootstrap-required/resource';
 import { bootstrapAdmin } from './functions/bootstrap-admin/resource';
@@ -20,6 +21,7 @@ const backend = defineBackend({
   attachmentUrl,
   bootstrapRequired,
   bootstrapAdmin,
+  accountRequest,
   adminOps,
   messageAlerts,
   profileSync,
@@ -90,6 +92,25 @@ backend.messageAlerts.resources.lambda.addToRolePolicy(
 );
 
 backend.messageAlerts.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  }),
+);
+
+backend.accountRequest.addEnvironment(
+  'MESSENGER_FROM_EMAIL',
+  process.env.MESSENGER_FROM_EMAIL ?? '',
+);
+backend.accountRequest.addEnvironment(
+  'MESSENGER_FROM_DISPLAY_NAME',
+  process.env.MESSENGER_FROM_DISPLAY_NAME ?? '',
+);
+backend.accountRequest.addEnvironment(
+  'MESSENGER_APP_URL',
+  process.env.MESSENGER_APP_URL ?? '',
+);
+backend.accountRequest.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['ses:SendEmail', 'ses:SendRawEmail'],
     resources: ['*'],

@@ -24,6 +24,8 @@ import {
 
   normalizeUsername,
 
+  contactEmailError,
+
   usernameError,
 
 } from '../lib/util';
@@ -42,7 +44,7 @@ type Props = {
 
 
 
-type Mode = 'checking' | 'bootstrap' | 'signIn' | 'newPassword' | 'authed';
+type Mode = 'checking' | 'bootstrap' | 'signIn' | 'requestAccount' | 'newPassword' | 'authed';
 
 
 
@@ -63,6 +65,10 @@ export default function AuthGate({ children }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [bootstrapMessage, setBootstrapMessage] = useState<string | null>(null);
+
+  const [requestAccountEmail, setRequestAccountEmail] = useState('');
+
+  const [requestAccountMessage, setRequestAccountMessage] = useState<string | null>(null);
 
 
 
@@ -264,6 +270,68 @@ export default function AuthGate({ children }: Props) {
 
 
 
+  async function handleRequestAccount(e: React.FormEvent) {
+
+    e.preventDefault();
+
+    setError(null);
+
+    setRequestAccountMessage(null);
+
+    const emailErr = contactEmailError(requestAccountEmail);
+
+    if (emailErr) {
+
+      setError(emailErr);
+
+      return;
+
+    }
+
+
+
+    setBusy(true);
+
+    try {
+
+      const { data, errors } = await client.mutations.requestAccountAccess(
+
+        {
+
+          contactEmail: requestAccountEmail.trim(),
+
+          appUrl: window.location.origin,
+
+        },
+
+        { authMode: 'apiKey' },
+
+      );
+
+      if (errors?.length || !data) {
+
+        throw new Error(errors?.[0]?.message ?? 'Could not submit your request');
+
+      }
+
+      setRequestAccountMessage(data.message);
+
+      setRequestAccountEmail('');
+
+    } catch (err) {
+
+      setError(mapAuthError(err));
+
+    } finally {
+
+      setBusy(false);
+
+    }
+
+  }
+
+
+
   async function handleNewPassword(e: React.FormEvent) {
 
     e.preventDefault();
@@ -448,6 +516,90 @@ export default function AuthGate({ children }: Props) {
 
 
 
+  if (mode === 'requestAccount') {
+
+    return (
+
+      <AuthShell
+
+        title="Request an account"
+
+        subtitle="Enter your email. An administrator will review your request and reply with login details."
+
+      >
+
+        <NoSaveForm
+
+          onSubmit={(e) => void handleRequestAccount(e)}
+
+          className="space-y-4"
+
+        >
+
+          <NoSaveField
+
+            label="Your email address"
+
+            type="email"
+
+            value={requestAccountEmail}
+
+            onChange={setRequestAccountEmail}
+
+            placeholder="you@example.com"
+
+          />
+
+          {requestAccountMessage && (
+
+            <p className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm text-[var(--color-accent)]">
+
+              {requestAccountMessage}
+
+            </p>
+
+          )}
+
+          {error && <p className="text-sm text-red-400">{error}</p>}
+
+          <Submit busy={busy} label="Submit request" />
+
+        </NoSaveForm>
+
+        <p className="mt-4 text-center text-sm">
+
+          <button
+
+            type="button"
+
+            className="text-[var(--color-accent)] hover:underline"
+
+            onClick={() => {
+
+              setMode('signIn');
+
+              setError(null);
+
+              setRequestAccountMessage(null);
+
+            }}
+
+          >
+
+            Back to sign in
+
+          </button>
+
+        </p>
+
+      </AuthShell>
+
+    );
+
+  }
+
+
+
   return (
 
     <AuthShell title="Private Messenger" subtitle="Sign in with your username">
@@ -486,9 +638,29 @@ export default function AuthGate({ children }: Props) {
 
       </NoSaveForm>
 
-      <p className="mt-4 text-center text-xs text-[var(--color-muted)]">
+      <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
 
-        Need an account? Ask your administrator to create one for you.
+        <button
+
+          type="button"
+
+          className="text-[var(--color-accent)] hover:underline"
+
+          onClick={() => {
+
+            setMode('requestAccount');
+
+            setError(null);
+
+            setRequestAccountMessage(null);
+
+          }}
+
+        >
+
+          Create New Account
+
+        </button>
 
       </p>
 

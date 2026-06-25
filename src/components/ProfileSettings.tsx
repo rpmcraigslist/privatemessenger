@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   getAlertPrefs,
@@ -21,6 +21,11 @@ import {
   type SessionUser,
 } from '../lib/session';
 
+import {
+  scrollElementIntoComfortableView,
+  useVisualViewportBottomInset,
+} from '../lib/visual-viewport';
+
 import { NoSaveField } from './NoSaveCredentials';
 
 type Props = {
@@ -36,6 +41,17 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dismissOnBackdropClick = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const keyboardInset = useVisualViewportBottomInset();
+
+  useEffect(() => {
+    if (keyboardInset === 0) return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !panelRef.current?.contains(active)) {
+      return;
+    }
+    requestAnimationFrame(() => scrollElementIntoComfortableView(active));
+  }, [keyboardInset]);
 
   function handleBackdropPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     dismissOnBackdropClick.current = e.target === e.currentTarget;
@@ -101,12 +117,21 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 sm:items-center sm:justify-center sm:p-4"
       onPointerDown={handleBackdropPointerDown}
       onClick={handleBackdropClick}
     >
       <div
-        className="w-full max-w-sm rounded-t-2xl bg-[var(--color-panel)] p-6 sm:rounded-2xl"
+        ref={panelRef}
+        className="w-full max-w-sm overflow-y-auto overscroll-contain rounded-t-2xl bg-[var(--color-panel)] p-6 sm:max-h-[min(90dvh,100%)] sm:rounded-2xl"
+        style={{
+          maxHeight:
+            keyboardInset > 0
+              ? `calc(100dvh - ${keyboardInset}px - 0.5rem)`
+              : 'min(90dvh, 100%)',
+          marginBottom: keyboardInset > 0 ? keyboardInset : undefined,
+          scrollPaddingBlock: '1.5rem',
+        }}
         onPointerDown={handlePanelPointerDown}
         onClick={(e) => e.stopPropagation()}
       >
@@ -140,6 +165,7 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
             value={contactEmail}
             onChange={setContactEmail}
             placeholder="you@example.com"
+            keepInViewOnFocus
           />
           <p className="text-xs text-[var(--color-muted)]">
             When saved, new messages email you from {`Private Messenger Service`}

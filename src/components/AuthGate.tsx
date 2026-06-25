@@ -68,6 +68,8 @@ export default function AuthGate({ children }: Props) {
 
   const [requestAccountEmail, setRequestAccountEmail] = useState('');
 
+  const [requestAccountUsername, setRequestAccountUsername] = useState('');
+
   const [requestAccountMessage, setRequestAccountMessage] = useState<string | null>(null);
 
 
@@ -278,6 +280,16 @@ export default function AuthGate({ children }: Props) {
 
     setRequestAccountMessage(null);
 
+    const usernameValidation = usernameError(requestAccountUsername);
+
+    if (usernameValidation) {
+
+      setError(usernameValidation);
+
+      return;
+
+    }
+
     const emailErr = contactEmailError(requestAccountEmail);
 
     if (emailErr) {
@@ -298,6 +310,8 @@ export default function AuthGate({ children }: Props) {
 
         {
 
+          username: normalizeUsername(requestAccountUsername),
+
           contactEmail: requestAccountEmail.trim(),
 
           appUrl: window.location.origin,
@@ -317,6 +331,8 @@ export default function AuthGate({ children }: Props) {
       setRequestAccountMessage(data.message);
 
       setRequestAccountEmail('');
+
+      setRequestAccountUsername('');
 
     } catch (err) {
 
@@ -524,7 +540,7 @@ export default function AuthGate({ children }: Props) {
 
         title="Request an account"
 
-        subtitle="Enter your email. An administrator will review your request and reply with login details."
+        subtitle="Choose a username and enter your email. An administrator will review your request and reply with login details."
 
       >
 
@@ -538,6 +554,18 @@ export default function AuthGate({ children }: Props) {
 
           <NoSaveField
 
+            label="Desired username"
+
+            value={requestAccountUsername}
+
+            onChange={setRequestAccountUsername}
+
+            placeholder="yourname"
+
+          />
+
+          <NoSaveField
+
             label="Your email address"
 
             type="email"
@@ -547,6 +575,8 @@ export default function AuthGate({ children }: Props) {
             onChange={setRequestAccountEmail}
 
             placeholder="you@example.com"
+
+            keepInViewOnFocus
 
           />
 
@@ -581,6 +611,8 @@ export default function AuthGate({ children }: Props) {
               setError(null);
 
               setRequestAccountMessage(null);
+
+              setRequestAccountUsername('');
 
             }}
 
@@ -653,6 +685,8 @@ export default function AuthGate({ children }: Props) {
             setError(null);
 
             setRequestAccountMessage(null);
+
+            setRequestAccountUsername('');
 
           }}
 

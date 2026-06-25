@@ -47,6 +47,7 @@ describe('message-alert-content', () => {
 
   it('builds admin account request email with claimed address', () => {
     const email = buildAccountRequestAdminEmail({
+      requesterUsername: 'newuser',
       requesterEmail: 'newuser@example.com',
       appUrl: 'https://main.d332i3bk71so1w.amplifyapp.com',
       requestedAtIso: '2026-06-23T12:00:00.000Z',
@@ -54,7 +55,8 @@ describe('message-alert-content', () => {
 
     expect(email.subject).toContain('account request');
     expect(email.textBody).toContain('newuser@example.com');
-    expect(email.textBody).toContain('create a user for them');
+    expect(email.textBody).toContain('Requested username: newuser');
+    expect(email.textBody).toContain('create a user with the requested username');
     expect(email.htmlBody).toContain('newuser@example.com');
   });
 });

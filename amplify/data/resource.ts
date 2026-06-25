@@ -219,6 +219,7 @@ const schema = a
     requestAccountAccess: a
       .mutation()
       .arguments({
+        username: a.string().required(),
         contactEmail: a.string().required(),
         appUrl: a.string(),
       })

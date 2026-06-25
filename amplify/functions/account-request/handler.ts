@@ -7,6 +7,10 @@ import { env } from '$amplify/env/account-request';
 import { listAdminNotificationEmails } from '../shared/admin-notify';
 import { normalizeContactEmail } from '../shared/contact-email';
 import {
+  normalizeUsername,
+  usernameValidationError,
+} from '../shared/username';
+import {
   buildAccountRequestAdminEmail,
   formatSesFromAddress,
   resolveMessengerAppUrl,
@@ -28,6 +32,12 @@ function fromEmailAddress(): string | null {
 }
 
 export const handler: Handler = async (event) => {
+  const requestedUsername = normalizeUsername(event.arguments.username ?? '');
+  const usernameErr = usernameValidationError(requestedUsername);
+  if (usernameErr) {
+    throw new Error(usernameErr);
+  }
+
   const requesterEmail = normalizeContactEmail(event.arguments.contactEmail ?? '');
   if (!requesterEmail) {
     throw new Error('Enter a valid email address');
@@ -47,6 +57,7 @@ export const handler: Handler = async (event) => {
   const adminEmails = await listAdminNotificationEmails(client);
   if (adminEmails.length === 0) {
     console.warn('requestAccountAccess: no admin contact email on file', {
+      requestedUsername,
       requesterEmail,
     });
     return {
@@ -59,6 +70,7 @@ export const handler: Handler = async (event) => {
   const appUrl = resolveMessengerAppUrl(event.arguments.appUrl);
   const requestedAtIso = new Date().toISOString();
   const { subject, textBody, htmlBody } = buildAccountRequestAdminEmail({
+    requesterUsername: requestedUsername,
     requesterEmail,
     appUrl,
     requestedAtIso,
@@ -84,6 +96,7 @@ export const handler: Handler = async (event) => {
       notified = true;
       console.info('requestAccountAccess: admin notified', {
         adminEmail: toAddress.replace(/(^.).*(@.*$)/, '$1***$2'),
+        requesterUsername: requestedUsername,
         requesterEmail: requesterEmail.replace(/(^.).*(@.*$)/, '$1***$2'),
       });
     } catch (err) {

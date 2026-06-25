@@ -70,6 +70,7 @@ export function buildMessageAlertEmail(input: {
 }
 
 export function buildAccountRequestAdminEmail(input: {
+  requesterUsername: string;
   requesterEmail: string;
   appUrl: string;
   requestedAtIso: string;
@@ -78,12 +79,13 @@ export function buildAccountRequestAdminEmail(input: {
   const textBody = [
     'Someone used the login page to request a new Private Messenger account.',
     '',
+    `Requested username: ${input.requesterUsername}`,
     `Claimed email address: ${input.requesterEmail}`,
     `Requested at (UTC): ${input.requestedAtIso}`,
     '',
     'Next steps for you:',
     '1. Sign in to Private Messenger as admin.',
-    '2. Open Admin and create a user for them.',
+    '2. Open Admin and create a user with the requested username.',
     '3. Verify their email in Amazon SES (Ohio) if your account is still in sandbox.',
     '4. Reply to them directly with their username and temporary password.',
     '',
@@ -96,6 +98,7 @@ export function buildAccountRequestAdminEmail(input: {
   const htmlBody = [
     '<p>Someone used the login page to request a new Private Messenger account.</p>',
     '<ul>',
+    `<li><strong>Requested username:</strong> ${input.requesterUsername}</li>`,
     `<li><strong>Claimed email:</strong> ${input.requesterEmail}</li>`,
     `<li><strong>Requested at (UTC):</strong> ${input.requestedAtIso}</li>`,
     '</ul>',

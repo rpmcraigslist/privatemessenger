@@ -105,7 +105,7 @@ export function buildAccountRequestAdminEmail(input: {
     '<p><strong>Next steps:</strong></p>',
     '<ol>',
     '<li>Sign in to Private Messenger as admin.</li>',
-    '<li>Open Admin and create a user for them.</li>',
+    '<li>Open Admin and create a user with the requested username.</li>',
     '<li>Verify their email in Amazon SES (Ohio) if your account is still in sandbox.</li>',
     '<li>Reply to them directly with their username and temporary password.</li>',
     '</ol>',

@@ -62,7 +62,7 @@ export const handler: Handler = async (event) => {
     });
     return {
       message:
-        'Thanks — we received your request. An administrator will follow up by email when available.',
+        'We could not reach an administrator by email. Ask them to save a contact email in Profile, then try again.',
       notified: false,
     };
   }
@@ -110,7 +110,7 @@ export const handler: Handler = async (event) => {
   return {
     message: notified
       ? 'Thanks — your request was sent to the administrator. They will email you after reviewing it.'
-      : 'Thanks — we received your request. An administrator will follow up by email when available.',
+      : 'Your request was received, but the administrator notification email failed to send. Please try again later or contact them directly.',
     notified,
   };
 };

@@ -98,6 +98,12 @@ backend.messageAlerts.resources.lambda.addToRolePolicy(
   }),
 );
 
+backend.accountRequest.addEnvironment('USER_POOL_ID', poolId);
+userPool.grant(
+  backend.accountRequest.resources.lambda,
+  'cognito-idp:ListUsersInGroup',
+  'cognito-idp:ListUsers',
+);
 backend.accountRequest.addEnvironment(
   'MESSENGER_FROM_EMAIL',
   process.env.MESSENGER_FROM_EMAIL ?? '',

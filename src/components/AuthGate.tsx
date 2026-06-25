@@ -328,6 +328,12 @@ export default function AuthGate({ children }: Props) {
 
       }
 
+      if (!data.notified) {
+
+        console.warn('account request did not notify admin', data);
+
+      }
+
       setRequestAccountMessage(data.message);
 
       setRequestAccountEmail('');
@@ -582,7 +588,13 @@ export default function AuthGate({ children }: Props) {
 
           {requestAccountMessage && (
 
-            <p className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm text-[var(--color-accent)]">
+            <p
+              className={`rounded-lg px-3 py-2 text-sm ${
+                requestAccountMessage.includes('failed to send')
+                  ? 'bg-red-500/10 text-red-300'
+                  : 'bg-[var(--color-panel-2)] text-[var(--color-accent)]'
+              }`}
+            >
 
               {requestAccountMessage}
 

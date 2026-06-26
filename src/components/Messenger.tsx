@@ -6,13 +6,7 @@ import {
 
   clearUnreadIndicators,
 
-  playMessageSound,
-
   setNotificationClickHandler,
-
-  shouldAlertForIncomingMessage,
-
-  showMessageNotification,
 
   syncUnreadIndicators,
 
@@ -42,15 +36,23 @@ import {
 
 import {
 
+  fetchAllMessages,
+
+  processIncomingMessageAlerts,
+
+  useRealtimeSyncEpoch,
+
+  useRefreshMessagesOnVisible,
+
+} from '../lib/message-sync';
+
+import {
+
   buildParticipantDirectory,
 
   buildHandleToSubDirectory,
 
-  conversationTitle,
-
   dedupeDirectConversations,
-
-  isSameMessengerUser,
 
   messageListPreview,
 
@@ -184,6 +186,8 @@ export default function Messenger({ onSignOut }: Props) {
   const pendingOptimisticMessagesRef = useRef(new Map<string, MessageModel>());
 
   const messageSyncReadyRef = useRef(false);
+
+  const realtimeSyncEpoch = useRealtimeSyncEpoch();
 
   const chatBackRef = useRef<ChatBackHandle | null>(null);
 
@@ -420,7 +424,77 @@ export default function Messenger({ onSignOut }: Props) {
 
     return () => sub.unsubscribe();
 
-  }, [user?.username]);
+  }, [user?.cognitoSub, realtimeSyncEpoch]);
+
+
+
+  const refreshMessagesFromServer = useCallback(async () => {
+
+    if (!userRef.current) return;
+
+    try {
+
+      const items = await fetchAllMessages();
+
+      setAllMessages((prev) =>
+
+        applyGlobalMessageSnapshot(
+
+          prev,
+
+          items,
+
+          knownMessageIdsRef.current,
+
+          pendingOptimisticMessagesRef.current,
+
+        ),
+
+      );
+
+      setMessagesSynced(true);
+
+      processIncomingMessageAlerts({
+
+        items,
+
+        seedOnly: !messageSyncReadyRef.current,
+
+        user: userRef.current,
+
+        selectedConversationId: selectedIdRef.current,
+
+        conversations: conversationsRef.current,
+
+        subToUsername: subToUsernameRef.current,
+
+        knownMessageIds: knownMessageIdsRef.current,
+
+      });
+
+      messageSyncReadyRef.current = true;
+
+    } catch (err) {
+
+      console.error('message refresh failed', err);
+
+    }
+
+  }, []);
+
+
+
+  useRefreshMessagesOnVisible(Boolean(user), refreshMessagesFromServer);
+
+
+
+  useEffect(() => {
+
+    if (!user || realtimeSyncEpoch === 0) return;
+
+    void refreshMessagesFromServer();
+
+  }, [realtimeSyncEpoch, refreshMessagesFromServer, user]);
 
 
 
@@ -588,11 +662,23 @@ export default function Messenger({ onSignOut }: Props) {
 
         if (!messageSyncReadyRef.current) {
 
-          for (const message of items) {
+          processIncomingMessageAlerts({
 
-            knownMessageIdsRef.current.add(message.id);
+            items,
 
-          }
+            seedOnly: true,
+
+            user: currentUser,
+
+            selectedConversationId: selectedIdRef.current,
+
+            conversations: conversationsRef.current,
+
+            subToUsername: subToUsernameRef.current,
+
+            knownMessageIds: knownMessageIdsRef.current,
+
+          });
 
           messageSyncReadyRef.current = true;
 
@@ -600,93 +686,23 @@ export default function Messenger({ onSignOut }: Props) {
 
         }
 
+        processIncomingMessageAlerts({
 
+          items,
 
-        for (const message of items) {
+          seedOnly: false,
 
-          if (knownMessageIdsRef.current.has(message.id)) continue;
+          user: currentUser,
 
-          knownMessageIdsRef.current.add(message.id);
+          selectedConversationId: selectedIdRef.current,
 
-          if (!message.conversationId) continue;
+          conversations: conversationsRef.current,
 
+          subToUsername: subToUsernameRef.current,
 
+          knownMessageIds: knownMessageIdsRef.current,
 
-          if (
-
-            isSameMessengerUser(
-
-              message.senderUsername,
-
-              currentUser.username,
-
-              currentUser.cognitoSub,
-
-              subToUsernameRef.current,
-
-            )
-
-          ) {
-
-            continue;
-
-          }
-
-
-
-          if (
-
-            !shouldAlertForIncomingMessage({
-
-              conversationId: message.conversationId,
-
-              selectedConversationId: selectedIdRef.current,
-
-            })
-
-          ) {
-
-            continue;
-
-          }
-
-
-
-          const conversation = conversationsRef.current.get(message.conversationId);
-
-          const title = conversation
-
-            ? conversationTitle(
-
-                conversation.participants,
-
-                conversation.name,
-
-                currentUser.cognitoSub,
-
-                currentUser.username,
-
-                subToUsernameRef.current,
-
-              )
-
-            : 'New message';
-
-
-
-          playMessageSound();
-
-          showMessageNotification({
-
-            conversationId: message.conversationId,
-
-            title,
-
-            body: messageListPreview(message),
-
-          });
-
-        }
+        });
 
       },
 
@@ -700,7 +716,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     return () => sub.unsubscribe();
 
-  }, [user?.cognitoSub]);
+  }, [user?.cognitoSub, realtimeSyncEpoch]);
 
 
 

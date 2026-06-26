@@ -317,6 +317,23 @@ export function repairParticipantSubs(
   return [...new Set(mapped)];
 }
 
+/** Like repairParticipantSubs, but fails when any participant is not a Cognito sub. */
+export function ensureParticipantSubs(
+  participants: string[],
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string[] {
+  const subs = repairParticipantSubs(participants, myUsername, mySub, handleToSub);
+  const unresolved = subs.filter((sub) => !isCognitoUuid(sub));
+  if (unresolved.length > 0) {
+    throw new Error(
+      'Could not resolve everyone in this chat. Reopen the app and try again.',
+    );
+  }
+  return subs;
+}
+
 export type ConversationLike = {
   id: string;
   isGroup?: boolean | null;

@@ -6,7 +6,7 @@ import {
   messageListPreview,
   normalizeUsername,
   participantDisplayName,
-  repairParticipantSubs,
+  ensureParticipantSubs,
   type ReplyTarget,
 } from '../lib/util';
 
@@ -75,7 +75,7 @@ export default function MessageComposer({
         type = file.type.startsWith('image/') ? 'image' : 'file';
       }
 
-      const participantUsernames = repairParticipantSubs(
+      const participantUsernames = ensureParticipantSubs(
         conversation.participants.filter((p): p is string => !!p),
         myUsername,
         mySub,

@@ -28,9 +28,7 @@ export let isBackendConfigured = false;
 export let isAdminBackendDeployed = false;
 
 /** Strongly-typed AppSync GraphQL client (queries, mutations, subscriptions). */
-export const client = generateClient<Schema>({
-  authMode: 'userPool',
-});
+export let client!: ReturnType<typeof generateClient<Schema>>;
 
 /**
  * Prefer live `/amplify_outputs.json` (written by Amplify Hosting after backend
@@ -59,6 +57,7 @@ export async function initAmplify(): Promise<void> {
 
   if (isBackendConfigured) {
     Amplify.configure(config as Parameters<typeof Amplify.configure>[0]);
+    client = generateClient<Schema>({ authMode: 'userPool' });
   }
 }
 

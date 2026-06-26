@@ -232,8 +232,9 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
               <div>
                 <h3 className="text-sm font-medium">Message alerts</h3>
                 <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-                  Optional alerts while the app is open in your browser. These are
-                  not text messages and cost nothing.
+                  Optional alerts while the app is open. Unread counts also appear
+                  on each chat in the list. When installed to your home screen,
+                  supported phones can show a number on the app icon too.
                 </p>
               </div>
 
@@ -247,10 +248,10 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                 <span className="text-sm">
                   <span className="font-medium">Pop-up when a message arrives</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
-                    Shows a small system notification (like other websites) when
-                    someone messages you and you are in another tab, another chat,
-                    or the app is in the background. Your browser will ask for
-                    permission the first time you turn this on.
+                    Shows a system notification for each new message when you are
+                    on the conversation list, in another chat, or the app is in
+                    the background. Not shown while you are actively viewing that
+                    chat. Your browser will ask for permission the first time.
                     {getNotificationPermission() === 'denied'
                       ? ' Currently blocked in browser settings.'
                       : ''}

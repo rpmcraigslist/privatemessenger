@@ -3,6 +3,7 @@ import { Hub } from 'aws-amplify/utils';
 
 import { client, type ConversationModel, type MessageModel } from './amplify';
 import {
+  getAlertPrefs,
   playMessageSound,
   shouldAlertForIncomingMessage,
   showMessageNotification,
@@ -45,26 +46,20 @@ function isViewingConversation(
   return messageConversationId === selectedConversationId;
 }
 
-/** Load every message the signed-in user can read (fallback when live sync stalls). */
-export async function fetchAllMessages(): Promise<MessageModel[]> {
-  const merged: MessageModel[] = [];
-  let nextToken: string | undefined;
-
-  for (;;) {
-    const page = await client.models.Message.list({
-      authMode: 'userPool',
-      limit: 200,
-      nextToken,
-    });
-    if (page.errors?.length) {
-      throw new Error(page.errors[0]?.message ?? 'Could not refresh messages');
-    }
-    merged.push(...page.data);
-    if (!page.nextToken) break;
-    nextToken = page.nextToken;
+function shouldNotifyForMessage(
+  messageConversationId: string,
+  selectedConversationId: string | null,
+): boolean {
+  const tabHidden =
+    typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  if (tabHidden) return true;
+  if (isViewingConversation(messageConversationId, selectedConversationId)) {
+    return false;
   }
-
-  return merged;
+  return shouldAlertForIncomingMessage({
+    conversationId: messageConversationId,
+    selectedConversationId,
+  });
 }
 
 function establishAlertBaseline(
@@ -89,6 +84,8 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
     return;
   }
 
+  const prefs = getAlertPrefs();
+
   for (const message of ctx.items) {
     if (!message.id || !message.conversationId) continue;
     if (ctx.alertState.baselineMessageIds.has(message.id)) continue;
@@ -106,23 +103,8 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
       continue;
     }
 
-    const tabHidden =
-      typeof document !== 'undefined' && document.visibilityState === 'hidden';
-    const viewingSameChat =
-      !tabHidden &&
-      isViewingConversation(message.conversationId, ctx.selectedConversationId);
-
-    if (viewingSameChat) {
+    if (!shouldNotifyForMessage(message.conversationId, ctx.selectedConversationId)) {
       ctx.alertState.alertedMessageIds.add(message.id);
-      continue;
-    }
-
-    if (
-      !shouldAlertForIncomingMessage({
-        conversationId: message.conversationId,
-        selectedConversationId: ctx.selectedConversationId,
-      })
-    ) {
       continue;
     }
 
@@ -139,7 +121,10 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
         )
       : 'New message';
 
-    playMessageSound();
+    if (prefs.soundEnabled) {
+      playMessageSound();
+    }
+
     showMessageNotification({
       messageId: message.id,
       conversationId: message.conversationId,
@@ -147,6 +132,28 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
       body: messageListPreview(message),
     });
   }
+}
+
+/** Load every message the signed-in user can read (fallback when live sync stalls). */
+export async function fetchAllMessages(): Promise<MessageModel[]> {
+  const merged: MessageModel[] = [];
+  let nextToken: string | undefined;
+
+  for (;;) {
+    const page = await client.models.Message.list({
+      authMode: 'userPool',
+      limit: 200,
+      nextToken,
+    });
+    if (page.errors?.length) {
+      throw new Error(page.errors[0]?.message ?? 'Could not refresh messages');
+    }
+    merged.push(...page.data);
+    if (!page.nextToken) break;
+    nextToken = page.nextToken;
+  }
+
+  return merged;
 }
 
 /** Bump when auth tokens refresh or network returns — restarts AppSync subscriptions. */
@@ -213,7 +220,7 @@ export function usePeriodicMessageRefresh(
   }, [enabled, intervalMs, refresh]);
 }
 
-/** Keep mobile audio unlocked after the first user gesture. */
+/** Keep mobile audio unlocked after user interaction. */
 export function useNotificationSoundUnlock(): void {
   useEffect(() => {
     const unlock = () => unlockNotificationSound();

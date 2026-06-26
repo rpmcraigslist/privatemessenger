@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 const PREFS_KEY = 'messenger:alert-prefs';
 const PROMPT_DISMISSED_KEY = 'messenger:notify-prompt-dismissed';
 const APP_TITLE = 'Private Messenger';
@@ -83,22 +85,42 @@ export function unlockNotificationSound(): void {
   }
 }
 
+async function setBadgeViaServiceWorker(count: number): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const controller = registration.active ?? navigator.serviceWorker.controller;
+    if (!controller) return false;
+    controller.postMessage({ type: 'set-badge', count });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function syncUnreadIndicators(totalUnread: number): Promise<void> {
   if (typeof document !== 'undefined') {
     document.title =
       totalUnread > 0 ? `(${formatBadgeCount(totalUnread)}) ${APP_TITLE}` : APP_TITLE;
   }
 
-  if (!isBadgeSupported()) return;
+  let badgeApplied = false;
 
-  try {
-    if (totalUnread > 0) {
-      await navigator.setAppBadge!(totalUnread);
-    } else {
-      await navigator.clearAppBadge!();
+  if (isBadgeSupported()) {
+    try {
+      if (totalUnread > 0) {
+        await navigator.setAppBadge!(totalUnread);
+      } else {
+        await navigator.clearAppBadge!();
+      }
+      badgeApplied = true;
+    } catch (err) {
+      console.warn('app badge update failed', err);
     }
-  } catch (err) {
-    console.warn('app badge update failed', err);
+  }
+
+  if (!badgeApplied) {
+    await setBadgeViaServiceWorker(totalUnread);
   }
 }
 
@@ -106,12 +128,16 @@ export async function clearUnreadIndicators(): Promise<void> {
   if (typeof document !== 'undefined') {
     document.title = APP_TITLE;
   }
-  if (!isBadgeSupported()) return;
-  try {
-    await navigator.clearAppBadge!();
-  } catch {
-    // ignore
+
+  if (isBadgeSupported()) {
+    try {
+      await navigator.clearAppBadge!();
+    } catch {
+      // ignore
+    }
   }
+
+  await setBadgeViaServiceWorker(0);
 }
 
 function playMessageSoundWithWebAudio(): void {
@@ -165,6 +191,17 @@ export function showMessageNotification(options: {
   void displayMessageNotification(options);
 }
 
+function attachNotificationClickHandler(
+  notification: Notification,
+  conversationId: string,
+): void {
+  notification.onclick = () => {
+    window.focus();
+    notificationClickHandler?.(conversationId);
+    notification.close();
+  };
+}
+
 async function displayMessageNotification(options: {
   messageId: string;
   conversationId: string;
@@ -180,22 +217,36 @@ async function displayMessageNotification(options: {
     data: { conversationId: options.conversationId },
   };
 
-  try {
-    if ('serviceWorker' in navigator) {
+  const pageVisible =
+    typeof document !== 'undefined' && document.visibilityState === 'visible';
+
+  // Foreground: page Notification API is more reliable than service worker.
+  if (pageVisible) {
+    try {
+      const notification = new Notification(options.title, payload);
+      attachNotificationClickHandler(notification, options.conversationId);
+      return;
+    } catch (err) {
+      console.warn('page notification failed', err);
+    }
+  }
+
+  if ('serviceWorker' in navigator) {
+    try {
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification(options.title, payload);
       return;
+    } catch (err) {
+      console.warn('service worker notification failed', err);
     }
-  } catch (err) {
-    console.warn('service worker notification failed', err);
   }
 
-  const notification = new Notification(options.title, payload);
-  notification.onclick = () => {
-    window.focus();
-    notificationClickHandler?.(options.conversationId);
-    notification.close();
-  };
+  try {
+    const notification = new Notification(options.title, payload);
+    attachNotificationClickHandler(notification, options.conversationId);
+  } catch (err) {
+    console.warn('notification fallback failed', err);
+  }
 }
 
 export function shouldAlertForIncomingMessage(options: {
@@ -206,6 +257,24 @@ export function shouldAlertForIncomingMessage(options: {
   if (document.visibilityState === 'hidden') return true;
   if (!options.selectedConversationId) return true;
   return options.conversationId !== options.selectedConversationId;
+}
+
+/** Re-apply icon badge when the app returns to the foreground. */
+export function useAppBadgeResync(totalUnread: number): void {
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState === 'visible') {
+        void syncUnreadIndicators(totalUnread);
+      }
+    };
+
+    document.addEventListener('visibilitychange', resync);
+    window.addEventListener('focus', resync);
+    return () => {
+      document.removeEventListener('visibilitychange', resync);
+      window.removeEventListener('focus', resync);
+    };
+  }, [totalUnread]);
 }
 
 function formatBadgeCount(count: number): string {

@@ -10,6 +10,8 @@ import {
 
   syncUnreadIndicators,
 
+  useAppBadgeResync,
+
 } from '../lib/app-notifications';
 
 import { loadUserDirectory } from '../lib/directory';
@@ -863,6 +865,10 @@ export default function Messenger({ onSignOut }: Props) {
     void syncUnreadIndicators(totalUnread);
 
   }, [totalUnread]);
+
+
+
+  useAppBadgeResync(totalUnread);
 
 
 

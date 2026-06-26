@@ -26,3 +26,23 @@ self.addEventListener('notificationclick', (event) => {
     })(),
   );
 });
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'set-badge') return;
+  const count = Number(event.data.count) || 0;
+  if (!('setAppBadge' in self.navigator)) return;
+
+  event.waitUntil(
+    (async () => {
+      try {
+        if (count > 0) {
+          await self.navigator.setAppBadge(count);
+        } else {
+          await self.navigator.clearAppBadge();
+        }
+      } catch {
+        // Badge API is optional on this device.
+      }
+    })(),
+  );
+});

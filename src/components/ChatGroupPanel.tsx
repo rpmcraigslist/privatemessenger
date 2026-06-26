@@ -12,6 +12,7 @@ type Props = {
   myUsername: string;
   mySub: string;
   subToUsername: Map<string, string>;
+  directoryLoading?: boolean;
   onClose: () => void;
   onRenamed: (name: string | null) => void;
 };
@@ -21,6 +22,7 @@ export default function ChatGroupPanel({
   myUsername,
   mySub,
   subToUsername,
+  directoryLoading = false,
   onClose,
   onRenamed,
 }: Props) {
@@ -97,6 +99,7 @@ export default function ChatGroupPanel({
               mySub,
               myUsername,
               subToUsername,
+              { directoryLoading },
             )}
           </p>
 
@@ -127,7 +130,9 @@ export default function ChatGroupPanel({
           </h3>
           <ul className="space-y-2">
             {members.map((participant) => {
-              const label = participantDisplayName(participant, subToUsername);
+              const label = participantDisplayName(participant, subToUsername, {
+                directoryLoading,
+              });
               const handle =
                 subToUsername.get(participant) ??
                 (participant === mySub ? myUsername : null);

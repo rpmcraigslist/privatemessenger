@@ -12,6 +12,7 @@ type Props = {
   latestByConversation: Map<string, { preview: string; at: string }>;
   selectedId: string | null;
   loading: boolean;
+  directoryLoading: boolean;
   unreadCounts: Map<string, number>;
   onSelect: (id: string) => void;
   onNewChat: () => void;
@@ -29,6 +30,7 @@ export default function ConversationList({
   latestByConversation,
   selectedId,
   loading,
+  directoryLoading,
   unreadCounts,
   onSelect,
   onNewChat,
@@ -42,11 +44,18 @@ export default function ConversationList({
     const q = query.trim().toLowerCase();
     if (!q) return conversations;
     return conversations.filter((c) =>
-      conversationTitle(c.participants, c.name, mySub, myUsername, subToUsername)
+      conversationTitle(
+        c.participants,
+        c.name,
+        mySub,
+        myUsername,
+        subToUsername,
+        { directoryLoading },
+      )
         .toLowerCase()
         .includes(q),
     );
-  }, [conversations, query, mySub, myUsername, subToUsername]);
+  }, [conversations, directoryLoading, query, mySub, myUsername, subToUsername]);
 
   return (
     <>
@@ -174,6 +183,7 @@ export default function ConversationList({
               mySub,
               myUsername,
               subToUsername,
+              { directoryLoading },
             );
             const active = c.id === selectedId;
             const unread = unreadCounts.get(c.id) ?? 0;

@@ -10,7 +10,7 @@ It uses **AWS Amplify Gen 2** (code-first backend under `amplify/`, CLI is `ampx
 | API (real-time) | AWS AppSync (GraphQL + WebSockets)       | 4M operations/month                         |
 | Database        | Amazon DynamoDB (on-demand)              | 25 GB storage                               |
 | File storage    | Amazon S3                                | 5 GB, 2,000 PUT, 20,000 GET                 |
-| Email alerts      | Amazon SES (via Lambda)                  | Verify sender in **us-east-2**; optional SMS still via SNS |
+| Email alerts      | Amazon SES (via Lambda)                  | Verify sender in **us-east-2** |
 | Web hosting     | Amazon S3 + CloudFront (Amplify Hosting) | 1 TB CloudFront data transfer out           |
 | Frontend        | React + Vite + TypeScript + Tailwind CSS | free (your code)                            |
 
@@ -23,10 +23,12 @@ It uses **AWS Amplify Gen 2** (code-first backend under `amplify/`, CLI is `ampx
 - **Temporary passwords** — new users must set a new password on first sign-in (`CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED`).
 - **1:1 and group chat** with real-time delivery (AppSync `observeQuery` subscriptions).
 - **Attachments** — images/files in S3; other participants download via the `getAttachmentUrl` Lambda (membership checked).
-- **Email alerts** — if a user saves a **contact email** in Profile, new messages send a one-way notification via **Amazon SES** (`sendMessageAlerts`) with a link to open the chat. Optional SMS via SNS if a phone number is saved.
+- **Email alerts** — if a user saves a **contact email** in Profile, new messages send a one-way notification via **Amazon SES** (`sendMessageAlerts`) with a link to open the chat.
+- **In-app alerts** — optional sound and pop-up notifications while Messenger is open (Profile → Message alerts).
+- **Delete your messages** — tap ··· on your own message → Delete; removed for all participants.
 - **Dark mobile-first UI** and an installable **PWA** shell (offline app shell only — messaging requires network).
 
-**Not included:** forgot-password flow, email verification UX, TOTP MFA (disabled in pool config), message edit/delete, read receipts, or push notifications (FCM).
+**Not included:** forgot-password flow, email verification UX, TOTP MFA (disabled in pool config), message edit, read receipts, SMS/text alerts, or background push notifications.
 
 ---
 
@@ -129,7 +131,7 @@ amplify/
     bootstrap-admin/           # create first admin (API key auth)
     admin-ops/                 # user CRUD, clear messages, listUserDirectory
     profile-sync/              # syncMyProfile on login, repair legacy participant ids
-    message-alerts/            # SES email (+ optional SNS SMS) on new messages
+    message-alerts/            # SES email on new messages
     attachment-url/            # presigned download URLs
     pre-sign-up/               # auto-confirm trigger
 src/
@@ -165,7 +167,7 @@ Authorization is enforced in AppSync, but some fields are still client-supplied 
 ### Known limitations (personal use OK, public internet risky)
 
 - Message `participantUsernames` and conversation `participants` are writable by clients — a modified app could tamper with membership ACL fields.
-- `sendMessageAlerts` does not verify the caller sent the message (SMS cost/abuse if phones are stored).
+- `sendMessageAlerts` does not verify the caller sent the message (email cost/abuse if contact emails are stored).
 - Public API-key bootstrap on an empty pool — deploy promptly after creating infrastructure.
 - No server-side disable of Cognito self-sign-up beyond UI hiding it (pool should be locked down for untrusted audiences).
 
@@ -173,9 +175,9 @@ Authorization is enforced in AppSync, but some fields are still client-supplied 
 
 ## Notifications
 
-**SMS (shipped):** optional E.164 phone on profile → SNS text when a message arrives (user must be signed in to send; alerts fire from client after send).
+**Email (optional):** save a **contact email** in Profile → SES sends a link when a message arrives (requires `MESSENGER_FROM_EMAIL` in Amplify env vars).
 
-**Web push / FCM (not shipped):** would need DynamoDB streams + FCM token storage. PWA service worker exists for caching static assets only.
+**In-app (optional):** enable sound and pop-ups in Profile while Messenger is open.
 
 ---
 
@@ -185,7 +187,6 @@ Realistic small deployment: often **$0–$5/month**. Set a **$5 AWS Budget** ale
 
 - Tear down unused sandboxes: `npx ampx sandbox delete`
 - `adminClearMessages` deletes DB rows but not S3 attachment objects (orphans possible)
-- SMS charges apply per message when phone alerts are enabled
 
 ---
 

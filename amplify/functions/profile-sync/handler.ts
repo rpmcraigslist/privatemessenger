@@ -118,7 +118,6 @@ export const handler: Handler = async (event) => {
         displayName: username,
         role,
         contactEmail,
-        smsNotificationsEnabled: false,
         avatarColor: isAdmin ? '#00a884' : '#64b5f6',
         messageBubbleColor: DEFAULT_MESSAGE_BUBBLE_COLOR,
       },

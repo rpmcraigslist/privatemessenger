@@ -32,7 +32,6 @@ frontend:
     build:
       commands:
         - test -f amplify_outputs.json && cp amplify_outputs.json public/amplify_outputs.json
-        - export VITE_MESSENGER_VAPID_PUBLIC_KEY="${MESSENGER_VAPID_PUBLIC_KEY:-}"
         - node -e "const o=require('./amplify_outputs.json'); console.log('outputs region:', o.auth?.aws_region, 'pool:', o.auth?.user_pool_id?.slice(0,12))"
         - npm run build
   artifacts:

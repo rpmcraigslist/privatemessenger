@@ -1,4 +1,3 @@
-import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';
 import { SendEmailCommand, SESClient } from '@aws-sdk/client-ses';
 import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtime';
 import { Amplify } from 'aws-amplify';
@@ -16,22 +15,12 @@ import {
   findProfileForParticipant,
   isParticipantSender,
   profileEmailTarget,
-  profileSmsTarget,
 } from '../shared/profiles';
-import {
-  clearWebPushOnProfile,
-  isExpiredWebPushError,
-  isWebPushConfigured,
-  messagePushPreview,
-  profileWebPushTarget,
-  sendWebPushAlert,
-} from '../shared/web-push';
 
 type Handler = Schema['sendMessageAlerts']['functionHandler'];
 type DataClient = ReturnType<typeof generateClient<Schema>>;
 type MessageModel = Schema['Message']['type'];
 
-const sns = new SNSClient({});
 const ses = new SESClient({});
 const dataClientPromise = getAmplifyDataClientConfig(
   env as Parameters<typeof getAmplifyDataClientConfig>[0],
@@ -40,7 +29,7 @@ const dataClientPromise = getAmplifyDataClientConfig(
   return generateClient<Schema>();
 });
 
-function smsSenderLabel(
+function alertSenderLabel(
   identityUsername: string | null,
   messageSenderUsername: string | null | undefined,
 ): string {
@@ -115,13 +104,9 @@ export const handler: Handler = async (event) => {
   }
 
   const { senderUsername, participantUsernames, conversationId } = message;
-  const senderName = smsSenderLabel(callerUsername, senderUsername);
+  const senderName = alertSenderLabel(callerUsername, senderUsername);
   const baseUrl = resolveMessengerAppUrl(appUrl);
   const openUrl = buildMessengerDeepLink(baseUrl, conversationId, messageId);
-  const smsBody = `You've got a new message from ${senderName}. Open: ${openUrl}`;
-  const pushTitle = `New message from ${senderName}`;
-  const pushBody = messagePushPreview(message);
-  const webPushEnabled = isWebPushConfigured();
 
   let sent = 0;
   let failed = 0;
@@ -136,15 +121,11 @@ export const handler: Handler = async (event) => {
 
     const profile = await findProfileForParticipant(client, participantId);
     const emailTarget = profileEmailTarget(profile);
-    const smsTarget = profileSmsTarget(profile);
-    const pushTarget = webPushEnabled ? profileWebPushTarget(profile) : null;
-    let delivered = false;
 
     if (emailTarget && fromEmail) {
       try {
         await sendEmailAlert(emailTarget.email, openUrl, senderName);
         sent++;
-        delivered = true;
         console.info('sendMessageAlerts: email sent', {
           participantId,
           email: emailTarget.email.replace(/(^.).*(@.*$)/, '$1***$2'),
@@ -162,74 +143,12 @@ export const handler: Handler = async (event) => {
       console.info('sendMessageAlerts: email skipped (no MESSENGER_FROM_EMAIL)', {
         participantId,
       });
-    }
-
-    if (smsTarget) {
-      try {
-        await sns.send(
-          new PublishCommand({
-            PhoneNumber: smsTarget.phone,
-            Message: smsBody,
-            MessageAttributes: {
-              'AWS.SNS.SMS.SMSType': {
-                DataType: 'String',
-                StringValue: 'Transactional',
-              },
-            },
-          }),
-        );
-        sent++;
-        delivered = true;
-        console.info('sendMessageAlerts: SMS sent', {
-          participantId,
-          phone: smsTarget.phone.replace(/\d(?=\d{4})/g, '*'),
-        });
-      } catch (err) {
-        failed++;
-        console.error('sendMessageAlerts: SMS failed', {
-          participantId,
-          phone: smsTarget.phone,
-          err,
-        });
-      }
-    }
-
-    if (pushTarget) {
-      try {
-        await sendWebPushAlert(pushTarget, {
-          title: pushTitle,
-          body: pushBody,
-          conversationId,
-          messageId: message.id!,
-        });
-        sent++;
-        delivered = true;
-        console.info('sendMessageAlerts: Web Push sent', { participantId });
-      } catch (err) {
-        failed++;
-        console.error('sendMessageAlerts: Web Push failed', { participantId, err });
-        if (profile && isExpiredWebPushError(err)) {
-          try {
-            await clearWebPushOnProfile(client, profile);
-          } catch (clearErr) {
-            console.error('sendMessageAlerts: could not clear expired Web Push', {
-              participantId,
-              clearErr,
-            });
-          }
-        }
-      }
-    }
-
-    if (!delivered && !emailTarget && !smsTarget && !pushTarget) {
+    } else {
       skipped++;
       console.info('sendMessageAlerts: skip recipient', {
         participantId,
         profileId: profile?.id,
         hasContactEmail: Boolean(profile?.contactEmail?.trim()),
-        smsEnabled: profile?.smsNotificationsEnabled,
-        hasPhone: Boolean(profile?.phoneNumber?.trim()),
-        hasWebPush: Boolean(pushTarget),
       });
     }
   }
@@ -241,7 +160,6 @@ export const handler: Handler = async (event) => {
     skipped,
     participantCount: participantUsernames?.length ?? 0,
     fromEmailConfigured: Boolean(fromEmail),
-    webPushConfigured: webPushEnabled,
   });
 
   return { sent, failed, skipped, conversationId };

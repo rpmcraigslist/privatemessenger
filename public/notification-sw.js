@@ -1,28 +1,3 @@
-self.addEventListener('push', (event) => {
-  let payload = {};
-  try {
-    payload = event.data?.json() ?? {};
-  } catch {
-    payload = {};
-  }
-
-  const title = payload.title || 'New message';
-  const body = payload.body || '';
-  const conversationId = payload.conversationId;
-  const messageId = payload.messageId;
-
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      tag: messageId ? `message-${messageId}` : 'message',
-      renotify: true,
-      icon: '/icon.svg',
-      badge: '/icon.svg',
-      data: { conversationId },
-    }),
-  );
-});
-
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const conversationId = event.notification.data?.conversationId;

@@ -6,7 +6,6 @@ import { bootstrapAdmin } from '../functions/bootstrap-admin/resource';
 import { adminOps } from '../functions/admin-ops/resource';
 import { messageAlerts } from '../functions/message-alerts/resource';
 import { profileSync } from '../functions/profile-sync/resource';
-import { pushRegister } from '../functions/push-register/resource';
 import { readCursor } from '../functions/read-cursor/resource';
 
 const schema = a
@@ -19,12 +18,7 @@ const schema = a
         avatarColor: a.string(),
         messageBubbleColor: a.string(),
         role: a.enum(['admin', 'user']),
-        phoneNumber: a.string(),
-        smsNotificationsEnabled: a.boolean(),
         contactEmail: a.string(),
-        webPushEndpoint: a.string(),
-        webPushP256dh: a.string(),
-        webPushAuth: a.string(),
       })
       .secondaryIndexes((index) => [index('username'), index('cognitoSub')])
       .authorization((allow) => [
@@ -197,10 +191,6 @@ const schema = a
       messageBubbleColor: a.string(),
     }),
 
-    WebPushSubscriptionResult: a.customType({
-      registered: a.boolean().required(),
-    }),
-
     DirectoryUser: a.customType({
       id: a.string().required(),
       username: a.string().required(),
@@ -340,18 +330,6 @@ const schema = a
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(profileSync)),
 
-    updateWebPushSubscription: a
-      .mutation()
-      .arguments({
-        enabled: a.boolean().required(),
-        endpoint: a.string(),
-        p256dh: a.string(),
-        auth: a.string(),
-      })
-      .returns(a.ref('WebPushSubscriptionResult'))
-      .authorization((allow) => [allow.authenticated()])
-      .handler(a.handler.function(pushRegister)),
-
     listMyReadCursors: a
       .query()
       .returns(a.ref('ReadCursorRow').array())
@@ -388,7 +366,6 @@ const schema = a
     allow.resource(messageAlerts),
     allow.resource(profileSync),
     allow.resource(readCursor),
-    allow.resource(pushRegister),
   ]);
 
 export type Schema = ClientSchema<typeof schema>;

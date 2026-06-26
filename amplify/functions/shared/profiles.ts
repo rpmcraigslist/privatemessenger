@@ -74,15 +74,6 @@ export function isParticipantSender(
   return handle === caller;
 }
 
-export function profileSmsTarget(
-  profile: UserProfile | null | undefined,
-): { phone: string } | null {
-  if (!profile || profile.smsNotificationsEnabled !== true) return null;
-  const phone = profile.phoneNumber?.trim();
-  if (!phone) return null;
-  return { phone };
-}
-
 /** Real-world email saved on profile for new-message alerts. */
 export function profileEmailTarget(
   profile: UserProfile | null | undefined,

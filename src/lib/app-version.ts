@@ -1,2 +1,2 @@
 /** User-facing release label shown on the sign-in screen. Bump for each deploy. */
-export const APP_VERSION = '2.2.0';
+export const APP_VERSION = '2.3.0';

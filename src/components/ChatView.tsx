@@ -4,14 +4,16 @@ import { client, type ConversationModel, type MessageModel } from '../lib/amplif
 
 import {
   findFirstUnreadMessage,
-  getLastReadAt,
-  markConversationReadThrough,
+  getLastReadAtForConversation,
+  markConversationReadThroughForConversation,
   resolveReadScopeKey,
 } from '../lib/read-state';
 
 import {
 
   conversationTitle,
+
+  type DisplayNameOptions,
 
   formatTime,
 
@@ -63,6 +65,8 @@ type Props = {
   handleToSub: Map<string, string>;
 
   subToUsername: Map<string, string>;
+
+  directoryLoading?: boolean;
 
   myMessageBubbleColor: string | null;
 
@@ -122,6 +126,8 @@ export default function ChatView({
   handleToSub,
 
   subToUsername,
+
+  directoryLoading = false,
 
   myMessageBubbleColor,
 
@@ -230,18 +236,25 @@ export default function ChatView({
     (items: MessageModel[]) => {
       latestMessagesRef.current = items;
       if (
-        markConversationReadThrough(
+        markConversationReadThroughForConversation(
           mySub,
           myUsername,
-          readScopeKey,
+          conversation,
+          myUsername,
+          mySub,
+          handleToSub,
           items,
-          conversation.id,
         )
       ) {
         onConversationUpdatedRef.current();
       }
     },
-    [conversation.id, mySub, myUsername, readScopeKey],
+    [conversation, handleToSub, mySub, myUsername],
+  );
+
+  const displayNameOptions = useMemo(
+    () => ({ directoryLoading }),
+    [directoryLoading],
   );
 
   const title = conversationTitle(
@@ -250,6 +263,7 @@ export default function ChatView({
     mySub,
     myUsername,
     subToUsername,
+    displayNameOptions,
   );
 
   const searchMatches = useMemo(() => {
@@ -390,6 +404,14 @@ export default function ChatView({
     async (message: MessageModel) => {
 
       setMessageMenu(null);
+
+      if (
+        !window.confirm(
+          'Delete this message? Other participants will no longer see it.',
+        )
+      ) {
+        return;
+      }
 
       setDeleteBusyId(message.id);
 
@@ -589,11 +611,13 @@ export default function ChatView({
     }
 
     if (!positioned) {
-      const lastReadAt = getLastReadAt(
+      const lastReadAt = getLastReadAtForConversation(
         mySub,
         myUsername,
-        readScopeKey,
-        conversation.id,
+        conversation,
+        myUsername,
+        mySub,
+        handleToSub,
       );
       const firstUnread = findFirstUnreadMessage(
         messages,
@@ -1164,6 +1188,8 @@ export default function ChatView({
 
                     subToUsername={subToUsername}
 
+                    displayNameOptions={displayNameOptions}
+
                     searchQuery={hasSearch && isSearchHit ? trimmedSearch : ''}
 
                     deleting={deleteBusyId === m.id}
@@ -1283,6 +1309,8 @@ export default function ChatView({
           mySub={mySub}
 
           subToUsername={subToUsername}
+
+          directoryLoading={directoryLoading}
 
           onClose={() => setShowDetails(false)}
 
@@ -1462,6 +1490,8 @@ function Bubble({
 
   subToUsername,
 
+  displayNameOptions,
+
   searchQuery,
 
   deleting,
@@ -1483,6 +1513,8 @@ function Bubble({
   showSender: boolean;
 
   subToUsername: Map<string, string>;
+
+  displayNameOptions?: DisplayNameOptions;
 
   searchQuery: string;
 
@@ -1594,7 +1626,11 @@ function Bubble({
 
           >
 
-            {participantDisplayName(message.senderUsername, subToUsername)}
+            {participantDisplayName(
+              message.senderUsername,
+              subToUsername,
+              displayNameOptions,
+            )}
 
           </p>
 
@@ -1615,11 +1651,9 @@ function Bubble({
             <p className="text-xs font-semibold text-[var(--color-accent)]">
 
               {participantDisplayName(
-
                 message.replyToSenderUsername ?? '',
-
                 subToUsername,
-
+                displayNameOptions,
               )}
 
             </p>

@@ -8,7 +8,6 @@ import {
   setAlertPrefs,
   unlockNotificationSound,
 } from '../lib/app-notifications';
-import { isWebPushConfigured, syncWebPushSubscription } from '../lib/web-push';
 
 import {
   DEFAULT_MESSAGE_BUBBLE_COLOR,
@@ -84,11 +83,6 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
     setNotifyError(null);
     if (!enabled) {
       setAlertPrefsState(setAlertPrefs({ browserNotifications: false }));
-      try {
-        await syncWebPushSubscription(false);
-      } catch (err) {
-        console.warn('web push unsubscribe failed', err);
-      }
       return;
     }
     const permission = await requestNotificationPermission();
@@ -98,16 +92,6 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
       return;
     }
     setAlertPrefsState(setAlertPrefs({ browserNotifications: true }));
-    try {
-      await syncWebPushSubscription(true);
-    } catch (err) {
-      console.warn('web push registration failed', err);
-      if (!isWebPushConfigured()) {
-        setNotifyError(
-          'Pop-ups work in the app, but background alerts need VAPID keys on the server (see README).',
-        );
-      }
-    }
   }
 
   function toggleMessageSound(enabled: boolean) {
@@ -264,9 +248,8 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                   <span className="font-medium">Pop-up when a message arrives</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
                     Shows a system notification for each new message on any screen
-                    in the app. When Web Push is configured on the server, the same
-                    pop-up can appear even if another app (like a game) is in front.
-                    Your browser will ask for permission the first time.
+                    while Messenger is open. Your browser will ask for permission
+                    the first time.
                     {getNotificationPermission() === 'denied'
                       ? ' Currently blocked in browser settings.'
                       : ''}

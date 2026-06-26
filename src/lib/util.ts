@@ -250,14 +250,31 @@ export function pickUserHandle(
   return 'user';
 }
 
+/** Options for labels that depend on the profile directory. */
+export type DisplayNameOptions = {
+  directoryLoading?: boolean;
+};
+
+const UNRESOLVED_PARTICIPANT_LABEL = 'Loading...';
+const UNKNOWN_PARTICIPANT_LABEL = 'User';
+
 export function displayName(username: string): string {
   const handle = normalizeProfileHandle(username);
-  if (!handle) return 'User';
+  if (!handle) return UNKNOWN_PARTICIPANT_LABEL;
   return handle
     .split(/[.\-_]+/)
     .filter(Boolean)
     .map((p) => p[0].toUpperCase() + p.slice(1))
     .join(' ');
+}
+
+function unresolvedParticipantLabel(
+  participant: string,
+  options?: DisplayNameOptions,
+): string | null {
+  if (!options?.directoryLoading) return null;
+  if (!isInternalUserId(participant)) return null;
+  return UNRESOLVED_PARTICIPANT_LABEL;
 }
 
 /** Safe directory / profile label (never shows Cognito subs). */
@@ -269,7 +286,7 @@ export function profileDisplayLabel(
   const cleanTitle = normalizeProfileHandle(displayNameValue);
   if (cleanTitle) return displayName(cleanTitle);
   if (handle) return displayName(handle);
-  return 'User';
+  return UNKNOWN_PARTICIPANT_LABEL;
 }
 
 /** Map participant ids (sub, login id, handle) to bare handles for display. */
@@ -399,12 +416,15 @@ export function resolveParticipantHandle(
 export function participantDisplayName(
   participant: string,
   subToUsername: Map<string, string>,
+  options?: DisplayNameOptions,
 ): string {
   const mapped = subToUsername.get(participant);
   if (mapped) return displayName(mapped);
   const handle = normalizeProfileHandle(participant);
   if (handle) return displayName(handle);
-  return 'User';
+  return (
+    unresolvedParticipantLabel(participant, options) ?? UNKNOWN_PARTICIPANT_LABEL
+  );
 }
 
 function collectSelfIdentityAliases(
@@ -752,6 +772,7 @@ export function conversationTitle(
   mySub: string,
   myUsername: string,
   subToUsername: Map<string, string>,
+  options?: DisplayNameOptions,
 ): string {
   if (name) return name;
   const others = participants.filter(
@@ -760,9 +781,9 @@ export function conversationTitle(
   );
   if (others.length === 0) return 'You';
   if (others.length === 1) {
-    return participantDisplayName(others[0], subToUsername);
+    return participantDisplayName(others[0], subToUsername, options);
   }
   return others
-    .map((p) => participantDisplayName(p, subToUsername))
+    .map((p) => participantDisplayName(p, subToUsername, options))
     .join(', ');
 }

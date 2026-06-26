@@ -5,8 +5,10 @@ import {
   findFirstUnreadMessage,
   findLastUnreadMessage,
   getLastReadAt,
+  getLastReadAtForConversation,
   isReadThrough,
   markConversationRead,
+  markConversationReadForConversation,
   markConversationReadThrough,
   resolveReadScopeKey,
 } from './read-state';
@@ -58,6 +60,77 @@ describe('read-state', () => {
     expect(getLastReadAt('sub-a', 'alice', scope, 'conv-old')).toBe(
       '2026-06-20T12:00:00.000Z',
     );
+  });
+
+  it('finds read cursors stored under legacy username peer keys', () => {
+    const conversation = {
+      id: 'conv-1',
+      isGroup: false,
+      participants: ['sub-a', 'lena'],
+    };
+    const legacyScope = resolveReadScopeKey(
+      conversation,
+      'alice',
+      'sub-a',
+      new Map(),
+    );
+    expect(legacyScope).toBe('peer:lena:sub-a');
+
+    markConversationRead(
+      'sub-a',
+      'alice',
+      legacyScope,
+      '2026-06-20T12:00:00.000Z',
+    );
+
+    const directory = new Map([['lena', 'sub-b']]);
+    const resolvedScope = resolveReadScopeKey(
+      conversation,
+      'alice',
+      'sub-a',
+      directory,
+    );
+    expect(resolvedScope).toBe('peer:sub-a:sub-b');
+    expect(getLastReadAt('sub-a', 'alice', resolvedScope)).toBeNull();
+
+    expect(
+      getLastReadAtForConversation(
+        'sub-a',
+        'alice',
+        conversation,
+        'alice',
+        'sub-a',
+        directory,
+      ),
+    ).toBe('2026-06-20T12:00:00.000Z');
+  });
+
+  it('writes read cursors to all alias keys when marking a conversation read', () => {
+    const conversation = {
+      id: 'conv-1',
+      isGroup: false,
+      participants: ['sub-a', 'lena'],
+    };
+    const directory = new Map([['lena', 'sub-b']]);
+
+    expect(
+      markConversationReadForConversation(
+        'sub-a',
+        'alice',
+        conversation,
+        'alice',
+        'sub-a',
+        directory,
+        '2026-06-20T12:00:00.000Z',
+      ),
+    ).toBe(true);
+
+    expect(
+      getLastReadAt('sub-a', 'alice', 'peer:lena:sub-a', 'conv-1'),
+    ).toBe('2026-06-20T12:00:00.000Z');
+    expect(
+      getLastReadAt('sub-a', 'alice', 'peer:sub-a:sub-b', 'conv-1'),
+    ).toBe('2026-06-20T12:00:00.000Z');
   });
 
   it('treats equal timestamps as read', () => {

@@ -6,7 +6,7 @@ This project uses **AWS Amplify Gen 2** — TypeScript-defined backend (`amplify
 
 ## Do I need an Amazon account?
 
-**Yes.** Cognito, AppSync, DynamoDB, S3, Lambda, and (optionally) SNS all run in AWS.
+**Yes.** Cognito, AppSync, DynamoDB, S3, Lambda, and (optionally) SES all run in AWS.
 
 1. Create an account: https://aws.amazon.com/free/
 2. IAM → **Users** → create a dev user
@@ -31,7 +31,7 @@ This project uses **AWS Amplify Gen 2** — TypeScript-defined backend (`amplify
 | Real-time API | AppSync GraphQL + WebSockets | Subscriptions for conversations/messages |
 | Data | DynamoDB on-demand | `Conversation`, `Message`, `UserProfile` |
 | Files | S3 + Cognito Identity Pool | Upload paths under `conversations/{id}/...` |
-| Backend logic | Lambda | Admin ops, profile sync, SMS, attachments, bootstrap |
+| Backend logic | Lambda | Admin ops, profile sync, email alerts, attachments, bootstrap |
 
 **Deploy flow:**
 
@@ -51,7 +51,7 @@ amplify/*.ts  →  ampx sandbox | pipeline-deploy  →  CloudFormation
 | `bootstrap-admin` | Public mutation: create first admin (empty pool only) |
 | `admin-ops` | Admin CRUD, clear messages, `listUserDirectory` |
 | `profile-sync` | `syncMyProfile` on login; repairs legacy participant ids |
-| `message-alerts` | Optional SNS SMS when messages arrive |
+| `message-alerts` | Email via SES when messages arrive |
 | `attachment-url` | Presigned S3 GET after membership check |
 | `pre-sign-up` | Auto-confirm new Cognito users |
 
@@ -162,12 +162,11 @@ After deploy, confirm in the build log or in `amplify_outputs.json`: every `aws_
 ### Email alerts (SES)
 
 1. **Amplify Console** (Ohio) → your app → **Hosting** → **Environment variables** → set `MESSENGER_FROM_EMAIL` (and optional `MESSENGER_APP_URL`).
-2. **Background pop-up alerts** (when another app is in front): generate VAPID keys (`npx web-push generate-vapid-keys`) and set `MESSENGER_VAPID_PUBLIC_KEY`, `MESSENGER_VAPID_PRIVATE_KEY`, and optional `MESSENGER_VAPID_SUBJECT` (`mailto:you@domain.com`). Redeploy the backend. The public key is passed to the frontend build as `VITE_MESSENGER_VAPID_PUBLIC_KEY` automatically.
-3. **Redeploy** `main` so the backend phase runs.
-4. **Amazon SES** in **`us-east-2`**: https://us-east-2.console.aws.amazon.com/ses/home?region=us-east-2#/account  
+2. **Redeploy** `main` so the backend phase runs.
+3. **Amazon SES** in **`us-east-2`**: https://us-east-2.console.aws.amazon.com/ses/home?region=us-east-2#/account  
    - Verify the **sender** address (same as `MESSENGER_FROM_EMAIL`).  
    - In **sandbox**, also verify each **recipient** contact email (e.g. `rmecham@posteo.com`).
-5. CloudWatch → **Lambda** → `message-alerts` → confirm logs show `fromEmailConfigured: true` and `email sent`, not `email skipped`.
+4. CloudWatch → **Lambda** → `message-alerts` → confirm logs show `fromEmailConfigured: true` and `email sent`, not `email skipped`.
 
 ---
 

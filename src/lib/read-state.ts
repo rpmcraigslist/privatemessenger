@@ -6,6 +6,7 @@ import {
 import {
   directConversationPeerKey,
   isMessageFromSelf,
+  repairParticipantSubs,
   type ConversationLike,
 } from './util';
 
@@ -39,6 +40,148 @@ export function resolveReadScopeKey(
   );
   if (peerKey) return `peer:${peerKey}`;
   return `conv:${conversation.id}`;
+}
+
+function peerScopeKeyFromParticipantIds(participantIds: string[]): string | null {
+  if (participantIds.length !== 2) return null;
+  return `peer:${participantIds.slice().sort().join(':')}`;
+}
+
+/**
+ * Legacy/alternate keys that may hold read cursors for the same thread.
+ * Peer keys change when the directory loads and usernames resolve to Cognito subs.
+ */
+export function readScopeAliasKeys(
+  conversation: ConversationLike,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string[] {
+  const aliases = new Set<string>();
+  const add = (key: string | null | undefined) => {
+    if (key) aliases.add(key);
+  };
+
+  add(`conv:${conversation.id}`);
+  aliases.add(conversation.id);
+  add(resolveReadScopeKey(conversation, myUsername, mySub, handleToSub));
+
+  if (!conversation.isGroup) {
+    const participants = conversation.participants.filter(
+      (participant): participant is string => !!participant,
+    );
+
+    const withoutDirectory = repairParticipantSubs(
+      participants,
+      myUsername,
+      mySub,
+      new Map(),
+    );
+    add(peerScopeKeyFromParticipantIds(withoutDirectory));
+    add(peerScopeKeyFromParticipantIds(participants));
+  }
+
+  return [...aliases];
+}
+
+/** Best read cursor across canonical and legacy scope keys. */
+export function getLastReadAtForConversation(
+  sub: string,
+  username: string,
+  conversation: ConversationLike,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string | null {
+  let latest: string | null = null;
+  for (const scopeKey of readScopeAliasKeys(
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  )) {
+    latest = maxIsoTimestamp(
+      latest,
+      getLastReadAt(sub, username, scopeKey, conversation.id),
+    );
+  }
+  return latest;
+}
+
+export function markConversationReadForConversation(
+  sub: string,
+  username: string,
+  conversation: ConversationLike,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+  readAtIso: string,
+): boolean {
+  const canonical = resolveReadScopeKey(
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  const aliases = readScopeAliasKeys(
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+
+  let previous: string | null = null;
+  for (const scopeKey of aliases) {
+    previous = maxIsoTimestamp(
+      previous,
+      getLastReadAt(sub, username, scopeKey, conversation.id),
+    );
+  }
+
+  const merged = maxIsoTimestamp(previous, readAtIso);
+  if (!merged || merged === previous) return false;
+
+  for (const scopeKey of aliases) {
+    for (const key of storageKeys(sub, username, scopeKey, conversation.id)) {
+      localStorage.setItem(key, merged);
+    }
+  }
+
+  mergeServerLastReadAt(sub, canonical, merged);
+  return true;
+}
+
+export function markConversationReadThroughForConversation(
+  sub: string,
+  username: string,
+  conversation: ConversationLike,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+  messages: readonly { createdAt?: string | null }[],
+): boolean {
+  const latest = latestMessageTimestamp(messages);
+  if (!latest) return false;
+
+  const previous = getLastReadAtForConversation(
+    sub,
+    username,
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  if (isReadThrough(previous, latest)) return false;
+
+  return markConversationReadForConversation(
+    sub,
+    username,
+    conversation,
+    myUsername,
+    mySub,
+    handleToSub,
+    latest,
+  );
 }
 
 function storageKeys(
@@ -345,13 +488,14 @@ export function effectiveLastReadAt(
   mySub: string,
   handleToSub: Map<string, string>,
 ): string | null {
-  const readScopeKey = resolveReadScopeKey(
+  const stored = getLastReadAtForConversation(
+    sub,
+    username,
     conversation,
     myUsername,
     mySub,
     handleToSub,
   );
-  const stored = getLastReadAt(sub, username, readScopeKey, conversation.id);
   const scopedMessages = messagesForReadScope(
     conversation,
     allConversations,

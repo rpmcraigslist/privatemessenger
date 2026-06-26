@@ -6,8 +6,6 @@ import {
 
   clearUnreadIndicators,
 
-  getAlertPrefs,
-
   setNotificationClickHandler,
 
   syncUnreadIndicators,
@@ -20,7 +18,7 @@ import { loadUserDirectory } from '../lib/directory';
 
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
 
-import { loadServerReadState, installReadStateFlushHooks } from '../lib/read-state-sync';
+import { loadServerReadState, installReadStateFlushHooks, onReadStateLoaded } from '../lib/read-state-sync';
 
 import { consumePendingDeepLink } from '../lib/deep-link';
 
@@ -53,8 +51,6 @@ import {
   usePeriodicMessageRefresh,
 
 } from '../lib/message-sync';
-
-import { useWebPushSubscription } from '../lib/web-push';
 
 import {
 
@@ -151,6 +147,8 @@ export default function Messenger({ onSignOut }: Props) {
 
   const [loading, setLoading] = useState(true);
 
+  const [directoryLoading, setDirectoryLoading] = useState(true);
+
   const [readRevision, setReadRevision] = useState(0);
 
   const [subToUsername, setSubToUsername] = useState<Map<string, string>>(
@@ -204,8 +202,6 @@ export default function Messenger({ onSignOut }: Props) {
   const realtimeSyncEpoch = useRealtimeSyncEpoch();
 
   useNotificationSoundUnlock();
-
-  useWebPushSubscription(getAlertPrefs().browserNotifications);
 
   const chatBackRef = useRef<ChatBackHandle | null>(null);
 
@@ -312,9 +308,15 @@ export default function Messenger({ onSignOut }: Props) {
 
       setBubbleColorByKey(buildBubbleColorDirectory(profiles));
 
+      setReadRevision((revision) => revision + 1);
+
     } catch (err) {
 
       console.error('failed to load profile directory', err);
+
+    } finally {
+
+      setDirectoryLoading(false);
 
     }
 
@@ -326,15 +328,21 @@ export default function Messenger({ onSignOut }: Props) {
 
     const sessionUser = await resolveCurrentUser();
 
+    setDirectoryLoading(true);
+
+    const directoryPromise = reloadDirectory();
+
     await loadServerReadState(sessionUser.cognitoSub, sessionUser.username);
 
     setUser(sessionUser);
 
     setBootError(null);
 
+    await directoryPromise;
+
     return sessionUser;
 
-  }, []);
+  }, [reloadDirectory]);
 
 
 
@@ -384,9 +392,13 @@ export default function Messenger({ onSignOut }: Props) {
 
     if (!user) return;
 
-    void reloadDirectory();
+    return onReadStateLoaded(() => {
 
-  }, [user?.username, reloadDirectory]);
+      setReadRevision((revision) => revision + 1);
+
+    });
+
+  }, [user?.cognitoSub]);
 
 
 
@@ -1082,6 +1094,8 @@ export default function Messenger({ onSignOut }: Props) {
 
           loading={loading}
 
+          directoryLoading={directoryLoading}
+
           unreadCounts={unreadCounts}
 
           onSelect={handleSelectConversation}
@@ -1129,6 +1143,8 @@ export default function Messenger({ onSignOut }: Props) {
             handleToSub={handleToSub}
 
             subToUsername={subToUsername}
+
+            directoryLoading={directoryLoading}
 
             myMessageBubbleColor={user.messageBubbleColor}
 

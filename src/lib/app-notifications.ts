@@ -208,14 +208,14 @@ async function displayMessageNotification(options: {
   title: string;
   body: string;
 }): Promise<void> {
-  const payload: NotificationOptions = {
+  const payload = {
     body: options.body,
     tag: `message-${options.messageId}`,
     renotify: true,
     icon: '/icon.svg',
     badge: '/icon.svg',
     data: { conversationId: options.conversationId },
-  };
+  } as NotificationOptions;
 
   const pageVisible =
     typeof document !== 'undefined' && document.visibilityState === 'visible';

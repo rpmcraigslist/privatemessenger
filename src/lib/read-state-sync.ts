@@ -1,6 +1,21 @@
 import { client } from './amplify';
 import { maxIsoTimestamp } from './read-state';
 
+let loadListeners = new Set<() => void>();
+
+function notifyLoadListeners(): void {
+  for (const listener of loadListeners) {
+    listener();
+  }
+}
+
+export function onReadStateLoaded(listener: () => void): () => void {
+  loadListeners.add(listener);
+  return () => {
+    loadListeners.delete(listener);
+  };
+}
+
 const PREFIX = 'messenger:read:';
 const pendingWrites = new Map<string, string>();
 const serverCache = new Map<string, string>();
@@ -154,6 +169,8 @@ export async function loadServerReadState(
         mergeServerLastReadAt(userSub, readScopeKey, lastReadAt);
       }
     }
+
+    notifyLoadListeners();
   })();
 
   return loadPromise;
@@ -165,6 +182,7 @@ export function resetReadStateSync(): void {
   flushPromise = null;
   serverCache.clear();
   pendingWrites.clear();
+  loadListeners.clear();
   if (flushTimer) {
     clearTimeout(flushTimer);
     flushTimer = null;

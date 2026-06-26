@@ -9,6 +9,7 @@ import {
   ensureParticipantSubs,
   type ReplyTarget,
 } from '../lib/util';
+import PendingAttachmentPreview from './PendingAttachmentPreview';
 
 type Props = {
   conversation: ConversationModel;
@@ -120,12 +121,12 @@ export default function MessageComposer({
             console.error('message alert mutation failed', errors);
           } else if (data && data.sent === 0 && (data.failed ?? 0) > 0) {
             console.error(
-              'message alert delivery failed — check SES/SNS config and CloudWatch logs',
+              'message alert delivery failed — check SES config and CloudWatch logs',
               data,
             );
           } else if (data && data.sent === 0 && (data.skipped ?? 0) > 0) {
             console.info(
-              'message alert skipped — recipient has no contact email or SMS configured',
+              'message alert skipped — recipient has no contact email configured',
               data,
             );
           }
@@ -196,19 +197,10 @@ export default function MessageComposer({
       )}
 
       {file && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm">
-          <span className="truncate">{file.name}</span>
-          <span className="shrink-0 text-xs text-[var(--color-muted)]">
-            {formatBytes(file.size)}
-          </span>
-          <button
-            onClick={() => pickFile(null)}
-            className="ml-auto text-[var(--color-muted)] hover:text-white"
-            aria-label="Remove attachment"
-          >
-            ✕
-          </button>
-        </div>
+        <PendingAttachmentPreview
+          file={file}
+          onRemove={() => pickFile(null)}
+        />
       )}
 
       <div className="flex items-end gap-2">

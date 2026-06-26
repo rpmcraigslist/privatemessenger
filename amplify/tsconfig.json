@@ -17,7 +17,6 @@
       "$amplify/env/bootstrap-admin": ["./env-stubs/function-env"],
       "$amplify/env/message-alerts": ["./env-stubs/function-env"],
       "$amplify/env/profile-sync": ["./env-stubs/function-env"],
-      "$amplify/env/push-register": ["./env-stubs/function-env"],
       "$amplify/env/read-cursor": ["./env-stubs/function-env"]
     }
   },

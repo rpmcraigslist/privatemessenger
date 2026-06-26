@@ -1,10 +1,9 @@
 import type { ConversationModel, MessageModel } from './amplify';
 import {
   countUnreadMessages,
-  getLastReadAt,
+  getLastReadAtForConversation,
   latestMessageTimestamp,
   messagesForReadScope,
-  resolveReadScopeKey,
 } from './read-state';
 
 /** Synchronous unread counts from in-memory messages (no stale API races). */
@@ -33,17 +32,13 @@ export function computeUnreadCounts(
       mySub,
       handleToSub,
     );
-    const readScopeKey = resolveReadScopeKey(
+    const lastReadAt = getLastReadAtForConversation(
+      mySub,
+      myUsername,
       conversation,
       myUsername,
       mySub,
       handleToSub,
-    );
-    const lastReadAt = getLastReadAt(
-      mySub,
-      myUsername,
-      readScopeKey,
-      conversation.id,
     );
 
     counts.set(

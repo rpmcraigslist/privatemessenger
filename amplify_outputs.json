@@ -471,8 +471,8 @@
               "isRequired": true,
               "attributes": []
             },
-            "phoneNumber": {
-              "name": "phoneNumber",
+            "contactEmail": {
+              "name": "contactEmail",
               "isArray": false,
               "type": "String",
               "isRequired": false,
@@ -568,6 +568,25 @@
             }
           }
         },
+        "DeleteMyMessageResult": {
+          "name": "DeleteMyMessageResult",
+          "fields": {
+            "messageId": {
+              "name": "messageId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "deleted": {
+              "name": "deleted",
+              "isArray": false,
+              "type": "Boolean",
+              "isRequired": true,
+              "attributes": []
+            }
+          }
+        },
         "MessageAlertsResult": {
           "name": "MessageAlertsResult",
           "fields": {
@@ -633,6 +652,32 @@
               "attributes": []
             }
           }
+        },
+        "ReadCursorRow": {
+          "name": "ReadCursorRow",
+          "fields": {
+            "readScopeKey": {
+              "name": "readScopeKey",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "lastReadAt": {
+              "name": "lastReadAt",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "conversationId": {
+              "name": "conversationId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            }
+          }
         }
       },
       "queries": {
@@ -670,6 +715,15 @@
               "isRequired": true
             }
           }
+        },
+        "listMyReadCursors": {
+          "name": "listMyReadCursors",
+          "isArray": true,
+          "type": {
+            "nonModel": "ReadCursorRow"
+          },
+          "isRequired": false,
+          "isArrayNullable": true
         }
       },
       "mutations": {
@@ -779,6 +833,22 @@
           },
           "isRequired": false
         },
+        "deleteMyMessage": {
+          "name": "deleteMyMessage",
+          "isArray": false,
+          "type": {
+            "nonModel": "DeleteMyMessageResult"
+          },
+          "isRequired": false,
+          "arguments": {
+            "messageId": {
+              "name": "messageId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true
+            }
+          }
+        },
         "sendMessageAlerts": {
           "name": "sendMessageAlerts",
           "isArray": false,
@@ -811,6 +881,34 @@
             },
             "messageBubbleColor": {
               "name": "messageBubbleColor",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
+            }
+          }
+        },
+        "upsertMyReadCursor": {
+          "name": "upsertMyReadCursor",
+          "isArray": false,
+          "type": {
+            "nonModel": "ReadCursorRow"
+          },
+          "isRequired": false,
+          "arguments": {
+            "readScopeKey": {
+              "name": "readScopeKey",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            },
+            "lastReadAt": {
+              "name": "lastReadAt",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            },
+            "conversationId": {
+              "name": "conversationId",
               "isArray": false,
               "type": "String",
               "isRequired": false

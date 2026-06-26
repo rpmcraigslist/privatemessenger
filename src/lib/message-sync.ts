@@ -8,7 +8,6 @@ import {
   showMessageNotification,
   unlockNotificationSound,
 } from './app-notifications';
-import { isWebPushRegisteredLocally } from './web-push';
 import type { SessionUser } from './session';
 import { conversationTitle, isSameMessengerUser, messageListPreview } from './util';
 
@@ -96,8 +95,7 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
       playMessageSound();
     }
 
-    // When Web Push is registered, the service worker shows pop-ups from the server.
-    if (prefs.browserNotifications && !isWebPushRegisteredLocally()) {
+    if (prefs.browserNotifications) {
       showMessageNotification({
         messageId: message.id,
         conversationId: message.conversationId,

@@ -4,6 +4,7 @@ import {
   isMessageFromSelf,
   isSameMessengerUser,
   matchesSelfSender,
+  participantDisplayName,
   repairParticipantSubs,
 } from './util';
 
@@ -185,5 +186,19 @@ describe('isMessageFromSelf', () => {
         },
       ),
     ).toBe(false);
+  });
+});
+
+describe('participantDisplayName', () => {
+  const peerSub = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+  it('shows Loading while the directory is still resolving subs', () => {
+    expect(
+      participantDisplayName(peerSub, new Map(), { directoryLoading: true }),
+    ).toBe('Loading...');
+  });
+
+  it('shows User for unresolved ids after the directory has loaded', () => {
+    expect(participantDisplayName(peerSub, new Map())).toBe('User');
   });
 });

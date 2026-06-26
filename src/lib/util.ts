@@ -405,6 +405,53 @@ export function dedupeDirectConversations<T extends ConversationLike>(
   });
 }
 
+/** Map every conversation id (including hidden duplicates) to the id shown in the UI. */
+export function buildCanonicalConversationIdMap<T extends ConversationLike>(
+  conversations: T[],
+  activityAt: (conversation: T) => string,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): Map<string, string> {
+  const visible = dedupeDirectConversations(
+    conversations,
+    activityAt,
+    myUsername,
+    mySub,
+    handleToSub,
+  );
+  const visibleIds = new Set(visible.map((conversation) => conversation.id));
+  const map = new Map<string, string>();
+
+  for (const conversation of conversations) {
+    if (visibleIds.has(conversation.id) || conversation.isGroup) {
+      map.set(conversation.id, conversation.id);
+      continue;
+    }
+
+    const key = directConversationPeerKey(
+      conversation,
+      myUsername,
+      mySub,
+      handleToSub,
+    );
+    if (!key) {
+      map.set(conversation.id, conversation.id);
+      continue;
+    }
+
+    const canonical = visible.find(
+      (candidate) =>
+        !candidate.isGroup &&
+        directConversationPeerKey(candidate, myUsername, mySub, handleToSub) ===
+          key,
+    );
+    map.set(conversation.id, canonical?.id ?? conversation.id);
+  }
+
+  return map;
+}
+
 function resolveParticipantSub(
   participant: string,
   myUsername: string,

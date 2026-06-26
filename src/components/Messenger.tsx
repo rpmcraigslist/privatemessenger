@@ -44,6 +44,8 @@ import {
 
   useRefreshMessagesOnVisible,
 
+  usePeriodicMessageRefresh,
+
 } from '../lib/message-sync';
 
 import {
@@ -51,6 +53,8 @@ import {
   buildParticipantDirectory,
 
   buildHandleToSubDirectory,
+
+  buildCanonicalConversationIdMap,
 
   dedupeDirectConversations,
 
@@ -184,6 +188,8 @@ export default function Messenger({ onSignOut }: Props) {
   const knownMessageIdsRef = useRef(new Set<string>());
 
   const pendingOptimisticMessagesRef = useRef(new Map<string, MessageModel>());
+
+  const canonicalConversationIdRef = useRef(new Map<string, string>());
 
   const messageSyncReadyRef = useRef(false);
 
@@ -444,7 +450,7 @@ export default function Messenger({ onSignOut }: Props) {
 
           items,
 
-          knownMessageIdsRef.current,
+          new Set(pendingOptimisticMessagesRef.current.keys()),
 
           pendingOptimisticMessagesRef.current,
 
@@ -470,6 +476,10 @@ export default function Messenger({ onSignOut }: Props) {
 
         knownMessageIds: knownMessageIdsRef.current,
 
+        resolveConversationId: (conversationId) =>
+
+          canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
+
       });
 
       messageSyncReadyRef.current = true;
@@ -485,6 +495,10 @@ export default function Messenger({ onSignOut }: Props) {
 
 
   useRefreshMessagesOnVisible(Boolean(user), refreshMessagesFromServer);
+
+
+
+  usePeriodicMessageRefresh(Boolean(user), refreshMessagesFromServer);
 
 
 
@@ -513,6 +527,50 @@ export default function Messenger({ onSignOut }: Props) {
     );
 
   }, [conversations]);
+
+
+
+  useEffect(() => {
+
+    if (!user) {
+
+      canonicalConversationIdRef.current = new Map();
+
+      return;
+
+    }
+
+    canonicalConversationIdRef.current = buildCanonicalConversationIdMap(
+
+      conversations,
+
+      (conversation) => conversation.lastMessageAt ?? conversation.createdAt,
+
+      user.username,
+
+      user.cognitoSub,
+
+      handleToSub,
+
+    );
+
+  }, [conversations, handleToSub, user]);
+
+
+
+  useEffect(() => {
+
+    if (!user || !selectedId) return;
+
+    const canonical =
+
+      canonicalConversationIdRef.current.get(selectedId) ?? selectedId;
+
+    if (canonical === selectedId) return;
+
+    setSelectedId(canonical);
+
+  }, [conversations, handleToSub, selectedId, user]);
 
 
 
@@ -590,67 +648,59 @@ export default function Messenger({ onSignOut }: Props) {
 
         }
 
-        setAllMessages((prev) =>
-
-          isSynced
-
-            ? applyGlobalMessageSnapshot(
-
-                prev,
-
-                items,
-
-                knownMessageIdsRef.current,
-
-                pendingOptimisticMessagesRef.current,
-
-              )
-
-            : mergeMessages(prev, items),
-
-        );
+        setAllMessages((prev) => mergeMessages(prev, items));
 
         setMessagesSynced(isSynced);
 
 
 
-        const next = new Map<string, LatestMessagePreview>();
+        const canonicalConversationId = (conversationId: string) =>
+
+          canonicalConversationIdRef.current.get(conversationId) ?? conversationId;
+
+
 
         const merged = mergeMessages([], items);
 
-        for (const message of merged) {
 
-          if (!message.conversationId) continue;
 
-          const current = next.get(message.conversationId);
+        setLatestByConversation((prev) => {
 
-          if (
+          const next = new Map(prev);
 
-            current &&
+          for (const message of merged) {
 
-            new Date(current.at).getTime() >= new Date(message.createdAt).getTime()
+            if (!message.conversationId) continue;
 
-          ) {
+            const canonicalId = canonicalConversationId(message.conversationId);
 
-            continue;
+            const current = next.get(canonicalId);
+
+            if (
+
+              current &&
+
+              new Date(current.at).getTime() >= new Date(message.createdAt).getTime()
+
+            ) {
+
+              continue;
+
+            }
+
+            next.set(canonicalId, {
+
+              preview: messageListPreview(message),
+
+              at: message.createdAt,
+
+            });
 
           }
 
-          next.set(message.conversationId, {
+          return next;
 
-            preview: messageListPreview(message),
-
-            at: message.createdAt,
-
-          });
-
-        }
-
-        setLatestByConversation(next);
-
-
-
-        if (!isSynced) return;
+        });
 
 
 
@@ -661,6 +711,8 @@ export default function Messenger({ onSignOut }: Props) {
 
 
         if (!messageSyncReadyRef.current) {
+
+          if (!isSynced) return;
 
           processIncomingMessageAlerts({
 
@@ -678,6 +730,10 @@ export default function Messenger({ onSignOut }: Props) {
 
             knownMessageIds: knownMessageIdsRef.current,
 
+            resolveConversationId: (conversationId) =>
+
+              canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
+
           });
 
           messageSyncReadyRef.current = true;
@@ -685,6 +741,8 @@ export default function Messenger({ onSignOut }: Props) {
           return;
 
         }
+
+
 
         processIncomingMessageAlerts({
 
@@ -701,6 +759,10 @@ export default function Messenger({ onSignOut }: Props) {
           subToUsername: subToUsernameRef.current,
 
           knownMessageIds: knownMessageIdsRef.current,
+
+          resolveConversationId: (conversationId) =>
+
+            canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
 
         });
 
@@ -966,9 +1028,27 @@ export default function Messenger({ onSignOut }: Props) {
 
     if (!selectedId) return [];
 
+    const selectedCanonical =
+
+      canonicalConversationIdRef.current.get(selectedId) ?? selectedId;
+
+
+
     return allMessages
 
-      .filter((message) => message.conversationId === selectedId)
+      .filter((message) => {
+
+        if (!message.conversationId) return false;
+
+        const messageCanonical =
+
+          canonicalConversationIdRef.current.get(message.conversationId) ??
+
+          message.conversationId;
+
+        return messageCanonical === selectedCanonical;
+
+      })
 
       .sort(
 
@@ -978,7 +1058,7 @@ export default function Messenger({ onSignOut }: Props) {
 
       );
 
-  }, [allMessages, selectedId]);
+  }, [allMessages, conversations, handleToSub, selectedId, user]);
 
 
 

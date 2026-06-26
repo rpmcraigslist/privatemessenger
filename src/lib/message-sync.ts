@@ -18,6 +18,7 @@ export type IncomingMessageAlertContext = {
   conversations: Map<string, ConversationModel>;
   subToUsername: Map<string, string>;
   knownMessageIds: Set<string>;
+  resolveConversationId?: (conversationId: string) => string;
 };
 
 /** Load every message the signed-in user can read (fallback when live sync stalls). */
@@ -69,14 +70,25 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
 
     if (
       !shouldAlertForIncomingMessage({
-        conversationId: message.conversationId,
-        selectedConversationId: ctx.selectedConversationId,
+        conversationId: ctx.resolveConversationId
+          ? ctx.resolveConversationId(message.conversationId)
+          : message.conversationId,
+        selectedConversationId: ctx.selectedConversationId
+          ? ctx.resolveConversationId
+            ? ctx.resolveConversationId(ctx.selectedConversationId)
+            : ctx.selectedConversationId
+          : null,
       })
     ) {
       continue;
     }
 
-    const conversation = ctx.conversations.get(message.conversationId);
+    const resolvedConversationId = ctx.resolveConversationId
+      ? ctx.resolveConversationId(message.conversationId)
+      : message.conversationId;
+    const conversation =
+      ctx.conversations.get(resolvedConversationId) ??
+      ctx.conversations.get(message.conversationId);
     const title = conversation
       ? conversationTitle(
           conversation.participants,
@@ -89,7 +101,7 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
 
     playMessageSound();
     showMessageNotification({
-      conversationId: message.conversationId,
+      conversationId: resolvedConversationId,
       title,
       body: messageListPreview(message),
     });
@@ -136,4 +148,26 @@ export function useRefreshMessagesOnVisible(
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [enabled, refresh]);
+}
+
+const MESSAGE_POLL_INTERVAL_MS = 5000;
+
+/** Fallback poll while the tab is open — live AppSync sync should be ~1–2s; poll caps delay at 5s. */
+export function usePeriodicMessageRefresh(
+  enabled: boolean,
+  refresh: () => void | Promise<void>,
+  intervalMs = MESSAGE_POLL_INTERVAL_MS,
+): void {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh();
+      }
+    };
+
+    const timer = window.setInterval(tick, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [enabled, intervalMs, refresh]);
 }

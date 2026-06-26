@@ -14,6 +14,7 @@ const playMessageSound = vi.fn();
 const showMessageNotification = vi.fn();
 
 vi.mock('./app-notifications', () => ({
+  getAlertPrefs: () => ({ browserNotifications: true, soundEnabled: true }),
   playMessageSound: (...args: unknown[]) => playMessageSound(...args),
   showMessageNotification: (...args: unknown[]) => showMessageNotification(...args),
   shouldAlertForIncomingMessage: (options: {

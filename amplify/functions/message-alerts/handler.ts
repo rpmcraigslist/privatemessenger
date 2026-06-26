@@ -18,6 +18,14 @@ import {
   profileEmailTarget,
   profileSmsTarget,
 } from '../shared/profiles';
+import {
+  clearWebPushOnProfile,
+  isExpiredWebPushError,
+  isWebPushConfigured,
+  messagePushPreview,
+  profileWebPushTarget,
+  sendWebPushAlert,
+} from '../shared/web-push';
 
 type Handler = Schema['sendMessageAlerts']['functionHandler'];
 type DataClient = ReturnType<typeof generateClient<Schema>>;
@@ -111,6 +119,9 @@ export const handler: Handler = async (event) => {
   const baseUrl = resolveMessengerAppUrl(appUrl);
   const openUrl = buildMessengerDeepLink(baseUrl, conversationId, messageId);
   const smsBody = `You've got a new message from ${senderName}. Open: ${openUrl}`;
+  const pushTitle = `New message from ${senderName}`;
+  const pushBody = messagePushPreview(message);
+  const webPushEnabled = isWebPushConfigured();
 
   let sent = 0;
   let failed = 0;
@@ -126,11 +137,14 @@ export const handler: Handler = async (event) => {
     const profile = await findProfileForParticipant(client, participantId);
     const emailTarget = profileEmailTarget(profile);
     const smsTarget = profileSmsTarget(profile);
+    const pushTarget = webPushEnabled ? profileWebPushTarget(profile) : null;
+    let delivered = false;
 
     if (emailTarget && fromEmail) {
       try {
         await sendEmailAlert(emailTarget.email, openUrl, senderName);
         sent++;
+        delivered = true;
         console.info('sendMessageAlerts: email sent', {
           participantId,
           email: emailTarget.email.replace(/(^.).*(@.*$)/, '$1***$2'),
@@ -143,18 +157,71 @@ export const handler: Handler = async (event) => {
           err,
         });
       }
-      continue;
-    }
-
-    if (emailTarget && !fromEmail) {
+    } else if (emailTarget && !fromEmail) {
       skipped++;
       console.info('sendMessageAlerts: email skipped (no MESSENGER_FROM_EMAIL)', {
         participantId,
       });
-      continue;
     }
 
-    if (!smsTarget) {
+    if (smsTarget) {
+      try {
+        await sns.send(
+          new PublishCommand({
+            PhoneNumber: smsTarget.phone,
+            Message: smsBody,
+            MessageAttributes: {
+              'AWS.SNS.SMS.SMSType': {
+                DataType: 'String',
+                StringValue: 'Transactional',
+              },
+            },
+          }),
+        );
+        sent++;
+        delivered = true;
+        console.info('sendMessageAlerts: SMS sent', {
+          participantId,
+          phone: smsTarget.phone.replace(/\d(?=\d{4})/g, '*'),
+        });
+      } catch (err) {
+        failed++;
+        console.error('sendMessageAlerts: SMS failed', {
+          participantId,
+          phone: smsTarget.phone,
+          err,
+        });
+      }
+    }
+
+    if (pushTarget) {
+      try {
+        await sendWebPushAlert(pushTarget, {
+          title: pushTitle,
+          body: pushBody,
+          conversationId,
+          messageId: message.id!,
+        });
+        sent++;
+        delivered = true;
+        console.info('sendMessageAlerts: Web Push sent', { participantId });
+      } catch (err) {
+        failed++;
+        console.error('sendMessageAlerts: Web Push failed', { participantId, err });
+        if (profile && isExpiredWebPushError(err)) {
+          try {
+            await clearWebPushOnProfile(client, profile);
+          } catch (clearErr) {
+            console.error('sendMessageAlerts: could not clear expired Web Push', {
+              participantId,
+              clearErr,
+            });
+          }
+        }
+      }
+    }
+
+    if (!delivered && !emailTarget && !smsTarget && !pushTarget) {
       skipped++;
       console.info('sendMessageAlerts: skip recipient', {
         participantId,
@@ -162,34 +229,7 @@ export const handler: Handler = async (event) => {
         hasContactEmail: Boolean(profile?.contactEmail?.trim()),
         smsEnabled: profile?.smsNotificationsEnabled,
         hasPhone: Boolean(profile?.phoneNumber?.trim()),
-      });
-      continue;
-    }
-
-    try {
-      await sns.send(
-        new PublishCommand({
-          PhoneNumber: smsTarget.phone,
-          Message: smsBody,
-          MessageAttributes: {
-            'AWS.SNS.SMS.SMSType': {
-              DataType: 'String',
-              StringValue: 'Transactional',
-            },
-          },
-        }),
-      );
-      sent++;
-      console.info('sendMessageAlerts: SMS sent', {
-        participantId,
-        phone: smsTarget.phone.replace(/\d(?=\d{4})/g, '*'),
-      });
-    } catch (err) {
-      failed++;
-      console.error('sendMessageAlerts: SMS failed', {
-        participantId,
-        phone: smsTarget.phone,
-        err,
+        hasWebPush: Boolean(pushTarget),
       });
     }
   }
@@ -201,6 +241,7 @@ export const handler: Handler = async (event) => {
     skipped,
     participantCount: participantUsernames?.length ?? 0,
     fromEmailConfigured: Boolean(fromEmail),
+    webPushConfigured: webPushEnabled,
   });
 
   return { sent, failed, skipped, conversationId };

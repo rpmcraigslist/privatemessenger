@@ -10,6 +10,7 @@ import { bootstrapAdmin } from './functions/bootstrap-admin/resource';
 import { adminOps } from './functions/admin-ops/resource';
 import { messageAlerts } from './functions/message-alerts/resource';
 import { profileSync } from './functions/profile-sync/resource';
+import { pushRegister } from './functions/push-register/resource';
 import { readCursor } from './functions/read-cursor/resource';
 
 // Backend deploy region: us-east-2 (see amplify/deployment-region.ts and amplify.yml).
@@ -25,6 +26,7 @@ const backend = defineBackend({
   adminOps,
   messageAlerts,
   profileSync,
+  pushRegister,
   readCursor,
 });
 
@@ -44,6 +46,9 @@ for (const fn of cognitoAdminFns) {
 
 backend.profileSync.addEnvironment('USER_POOL_ID', poolId);
 userPool.grant(backend.profileSync.resources.lambda, 'cognito-idp:ListUsers');
+
+backend.pushRegister.addEnvironment('USER_POOL_ID', poolId);
+userPool.grant(backend.pushRegister.resources.lambda, 'cognito-idp:ListUsers');
 
 userPool.grant(
   backend.bootstrapAdmin.resources.lambda,
@@ -81,6 +86,18 @@ backend.messageAlerts.addEnvironment(
 backend.messageAlerts.addEnvironment(
   'MESSENGER_APP_URL',
   process.env.MESSENGER_APP_URL ?? '',
+);
+backend.messageAlerts.addEnvironment(
+  'MESSENGER_VAPID_PUBLIC_KEY',
+  process.env.MESSENGER_VAPID_PUBLIC_KEY ?? '',
+);
+backend.messageAlerts.addEnvironment(
+  'MESSENGER_VAPID_PRIVATE_KEY',
+  process.env.MESSENGER_VAPID_PRIVATE_KEY ?? '',
+);
+backend.messageAlerts.addEnvironment(
+  'MESSENGER_VAPID_SUBJECT',
+  process.env.MESSENGER_VAPID_SUBJECT ?? '',
 );
 userPool.grant(backend.messageAlerts.resources.lambda, 'cognito-idp:ListUsers');
 

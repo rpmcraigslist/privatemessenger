@@ -8,6 +8,7 @@ import {
   setAlertPrefs,
   unlockNotificationSound,
 } from '../lib/app-notifications';
+import { isWebPushConfigured, syncWebPushSubscription } from '../lib/web-push';
 
 import {
   DEFAULT_MESSAGE_BUBBLE_COLOR,
@@ -83,6 +84,11 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
     setNotifyError(null);
     if (!enabled) {
       setAlertPrefsState(setAlertPrefs({ browserNotifications: false }));
+      try {
+        await syncWebPushSubscription(false);
+      } catch (err) {
+        console.warn('web push unsubscribe failed', err);
+      }
       return;
     }
     const permission = await requestNotificationPermission();
@@ -92,6 +98,16 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
       return;
     }
     setAlertPrefsState(setAlertPrefs({ browserNotifications: true }));
+    try {
+      await syncWebPushSubscription(true);
+    } catch (err) {
+      console.warn('web push registration failed', err);
+      if (!isWebPushConfigured()) {
+        setNotifyError(
+          'Pop-ups work in the app, but background alerts need VAPID keys on the server (see README).',
+        );
+      }
+    }
   }
 
   function toggleMessageSound(enabled: boolean) {
@@ -232,9 +248,8 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
               <div>
                 <h3 className="text-sm font-medium">Message alerts</h3>
                 <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-                  Optional alerts while the app is open. Unread counts also appear
-                  on each chat in the list. When installed to your home screen,
-                  supported phones can show a number on the app icon too.
+                  Sound and pop-ups on any screen while Messenger is open. Unread
+                  counts also appear on each chat in the list.
                 </p>
               </div>
 
@@ -248,10 +263,10 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                 <span className="text-sm">
                   <span className="font-medium">Pop-up when a message arrives</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
-                    Shows a system notification for each new message when you are
-                    on the conversation list, in another chat, or the app is in
-                    the background. Not shown while you are actively viewing that
-                    chat. Your browser will ask for permission the first time.
+                    Shows a system notification for each new message on any screen
+                    in the app. When Web Push is configured on the server, the same
+                    pop-up can appear even if another app (like a game) is in front.
+                    Your browser will ask for permission the first time.
                     {getNotificationPermission() === 'denied'
                       ? ' Currently blocked in browser settings.'
                       : ''}
@@ -269,8 +284,8 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
                 <span className="text-sm">
                   <span className="font-medium">Message sound</span>
                   <span className="mt-0.5 block text-[var(--color-muted)]">
-                    Play a short chime for new messages in another chat or while
-                    this tab is in the background.
+                    Play a short chime for every new incoming message on any screen
+                    while Messenger is open.
                   </span>
                 </span>
               </label>

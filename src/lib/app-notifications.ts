@@ -249,16 +249,6 @@ async function displayMessageNotification(options: {
   }
 }
 
-export function shouldAlertForIncomingMessage(options: {
-  conversationId: string;
-  selectedConversationId: string | null;
-}): boolean {
-  if (typeof document === 'undefined') return false;
-  if (document.visibilityState === 'hidden') return true;
-  if (!options.selectedConversationId) return true;
-  return options.conversationId !== options.selectedConversationId;
-}
-
 /** Re-apply icon badge when the app returns to the foreground. */
 export function useAppBadgeResync(totalUnread: number): void {
   useEffect(() => {

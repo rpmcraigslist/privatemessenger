@@ -6,6 +6,8 @@ import {
 
   clearUnreadIndicators,
 
+  getAlertPrefs,
+
   setNotificationClickHandler,
 
   syncUnreadIndicators,
@@ -51,6 +53,8 @@ import {
   usePeriodicMessageRefresh,
 
 } from '../lib/message-sync';
+
+import { useWebPushSubscription } from '../lib/web-push';
 
 import {
 
@@ -200,6 +204,8 @@ export default function Messenger({ onSignOut }: Props) {
   const realtimeSyncEpoch = useRealtimeSyncEpoch();
 
   useNotificationSoundUnlock();
+
+  useWebPushSubscription(getAlertPrefs().browserNotifications);
 
   const chatBackRef = useRef<ChatBackHandle | null>(null);
 

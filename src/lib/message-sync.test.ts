@@ -5,6 +5,7 @@ import {
   processIncomingMessageAlerts,
 } from './message-sync';
 import type { SessionUser } from './session';
+import { isWebPushRegisteredLocally } from './web-push';
 
 vi.mock('./amplify', () => ({
   client: { models: { Message: { list: vi.fn() } } },
@@ -17,16 +18,11 @@ vi.mock('./app-notifications', () => ({
   getAlertPrefs: () => ({ browserNotifications: true, soundEnabled: true }),
   playMessageSound: (...args: unknown[]) => playMessageSound(...args),
   showMessageNotification: (...args: unknown[]) => showMessageNotification(...args),
-  shouldAlertForIncomingMessage: (options: {
-    conversationId: string;
-    selectedConversationId: string | null;
-  }) => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      return true;
-    }
-    return options.conversationId !== options.selectedConversationId;
-  },
   unlockNotificationSound: vi.fn(),
+}));
+
+vi.mock('./web-push', () => ({
+  isWebPushRegisteredLocally: vi.fn(() => false),
 }));
 
 const user: SessionUser = {
@@ -102,7 +98,7 @@ describe('processIncomingMessageAlerts', () => {
     );
   });
 
-  it('does not alert while viewing the same chat', () => {
+  it('alerts while viewing the same chat', () => {
     const alertState = createMessageAlertState();
     establishBaseline(alertState, []);
 
@@ -115,8 +111,13 @@ describe('processIncomingMessageAlerts', () => {
       subToUsername: new Map(),
     });
 
-    expect(playMessageSound).not.toHaveBeenCalled();
-    expect(alertState.alertedMessageIds.has('m1')).toBe(true);
+    expect(playMessageSound).toHaveBeenCalledTimes(1);
+    expect(showMessageNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: 'm1',
+        conversationId: 'conv-a',
+      }),
+    );
   });
 
   it('keeps alerting new messages after token-style resync without re-baselining', () => {
@@ -156,16 +157,14 @@ describe('processIncomingMessageAlerts', () => {
     expect(playMessageSound).toHaveBeenCalledTimes(1);
   });
 
-  it('alerts when the tab is hidden even if that chat is selected', () => {
-    Object.defineProperty(document, 'visibilityState', {
-      configurable: true,
-      value: 'hidden',
-    });
+  it('skips in-app pop-up when Web Push is registered locally', () => {
+    vi.mocked(isWebPushRegisteredLocally).mockReturnValue(true);
+
     const alertState = createMessageAlertState();
     establishBaseline(alertState, []);
 
     processIncomingMessageAlerts({
-      items: [message('m1', 'conv-a')],
+      items: [message('m1', 'conv-b')],
       alertState,
       user,
       selectedConversationId: 'conv-a',
@@ -174,6 +173,9 @@ describe('processIncomingMessageAlerts', () => {
     });
 
     expect(playMessageSound).toHaveBeenCalledTimes(1);
+    expect(showMessageNotification).not.toHaveBeenCalled();
+
+    vi.mocked(isWebPushRegisteredLocally).mockReturnValue(false);
   });
 });
 

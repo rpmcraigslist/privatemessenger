@@ -5,10 +5,10 @@ import { client, type ConversationModel, type MessageModel } from './amplify';
 import {
   getAlertPrefs,
   playMessageSound,
-  shouldAlertForIncomingMessage,
   showMessageNotification,
   unlockNotificationSound,
 } from './app-notifications';
+import { isWebPushRegisteredLocally } from './web-push';
 import type { SessionUser } from './session';
 import { conversationTitle, isSameMessengerUser, messageListPreview } from './util';
 
@@ -37,30 +37,6 @@ export type IncomingMessageAlertContext = {
   conversations: Map<string, ConversationModel>;
   subToUsername: Map<string, string>;
 };
-
-function isViewingConversation(
-  messageConversationId: string,
-  selectedConversationId: string | null,
-): boolean {
-  if (!selectedConversationId) return false;
-  return messageConversationId === selectedConversationId;
-}
-
-function shouldNotifyForMessage(
-  messageConversationId: string,
-  selectedConversationId: string | null,
-): boolean {
-  const tabHidden =
-    typeof document !== 'undefined' && document.visibilityState === 'hidden';
-  if (tabHidden) return true;
-  if (isViewingConversation(messageConversationId, selectedConversationId)) {
-    return false;
-  }
-  return shouldAlertForIncomingMessage({
-    conversationId: messageConversationId,
-    selectedConversationId,
-  });
-}
 
 function establishAlertBaseline(
   state: MessageAlertState,
@@ -103,11 +79,6 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
       continue;
     }
 
-    if (!shouldNotifyForMessage(message.conversationId, ctx.selectedConversationId)) {
-      ctx.alertState.alertedMessageIds.add(message.id);
-      continue;
-    }
-
     ctx.alertState.alertedMessageIds.add(message.id);
 
     const conversation = ctx.conversations.get(message.conversationId);
@@ -125,12 +96,15 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
       playMessageSound();
     }
 
-    showMessageNotification({
-      messageId: message.id,
-      conversationId: message.conversationId,
-      title,
-      body: messageListPreview(message),
-    });
+    // When Web Push is registered, the service worker shows pop-ups from the server.
+    if (prefs.browserNotifications && !isWebPushRegisteredLocally()) {
+      showMessageNotification({
+        messageId: message.id,
+        conversationId: message.conversationId,
+        title,
+        body: messageListPreview(message),
+      });
+    }
   }
 }
 

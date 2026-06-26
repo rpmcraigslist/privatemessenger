@@ -7,6 +7,7 @@ import {
   requestNotificationPermission,
   setAlertPrefs,
 } from '../lib/app-notifications';
+import { syncWebPushSubscription } from '../lib/web-push';
 
 type Props = {
   onEnabled?: () => void;
@@ -29,6 +30,11 @@ export default function NotificationPrompt({ onEnabled }: Props) {
       const permission = await requestNotificationPermission();
       if (permission === 'granted') {
         setAlertPrefs({ browserNotifications: true });
+        try {
+          await syncWebPushSubscription(true);
+        } catch (err) {
+          console.warn('web push registration failed', err);
+        }
         onEnabled?.();
       }
       dismissNotifyPrompt();
@@ -49,8 +55,8 @@ export default function NotificationPrompt({ onEnabled }: Props) {
         <div className="min-w-0 flex-1">
           <p className="font-medium">Pop-up message alerts</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Get a small system notification when someone messages you and you are
-            not looking at that chat. Not SMS — free in the browser.
+            Get a small system notification when someone messages you — even if
+            another app is in front, once push is set up on the server.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">

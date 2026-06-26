@@ -162,11 +162,12 @@ After deploy, confirm in the build log or in `amplify_outputs.json`: every `aws_
 ### Email alerts (SES)
 
 1. **Amplify Console** (Ohio) → your app → **Hosting** → **Environment variables** → set `MESSENGER_FROM_EMAIL` (and optional `MESSENGER_APP_URL`).
-2. **Redeploy** `main` so the backend phase runs.
-3. **Amazon SES** in **`us-east-2`**: https://us-east-2.console.aws.amazon.com/ses/home?region=us-east-2#/account  
+2. **Background pop-up alerts** (when another app is in front): generate VAPID keys (`npx web-push generate-vapid-keys`) and set `MESSENGER_VAPID_PUBLIC_KEY`, `MESSENGER_VAPID_PRIVATE_KEY`, and optional `MESSENGER_VAPID_SUBJECT` (`mailto:you@domain.com`). Redeploy the backend. The public key is passed to the frontend build as `VITE_MESSENGER_VAPID_PUBLIC_KEY` automatically.
+3. **Redeploy** `main` so the backend phase runs.
+4. **Amazon SES** in **`us-east-2`**: https://us-east-2.console.aws.amazon.com/ses/home?region=us-east-2#/account  
    - Verify the **sender** address (same as `MESSENGER_FROM_EMAIL`).  
    - In **sandbox**, also verify each **recipient** contact email (e.g. `rmecham@posteo.com`).
-4. CloudWatch → **Lambda** → `message-alerts` → confirm logs show `fromEmailConfigured: true` and `email sent`, not `email skipped`.
+5. CloudWatch → **Lambda** → `message-alerts` → confirm logs show `fromEmailConfigured: true` and `email sent`, not `email skipped`.
 
 ---
 

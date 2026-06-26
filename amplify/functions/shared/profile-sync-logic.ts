@@ -30,6 +30,7 @@ export type SyncProfileResponse = {
   cognitoSub: string;
   role: string;
   contactEmail: string | null;
+  messageBubbleColor: string;
 };
 
 export function buildSyncProfileResponse(
@@ -38,6 +39,7 @@ export function buildSyncProfileResponse(
   cognitoSub: string,
   role: string,
   contactEmail: string | null,
+  messageBubbleColor: string,
 ): SyncProfileResponse {
   if (!profileId.trim()) {
     throw new Error('Profile row was not created');
@@ -48,5 +50,6 @@ export function buildSyncProfileResponse(
     cognitoSub,
     role,
     contactEmail,
+    messageBubbleColor,
   };
 }

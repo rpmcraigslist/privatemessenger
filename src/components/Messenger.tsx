@@ -40,6 +40,8 @@ import {
 
   processIncomingMessageAlerts,
 
+  processUnreadCountAlerts,
+
   useRealtimeSyncEpoch,
 
   useRefreshMessagesOnVisible,
@@ -61,6 +63,8 @@ import {
   messageListPreview,
 
 } from '../lib/util';
+
+import { buildBubbleColorDirectory } from '../lib/message-bubble-colors';
 
 import ConversationList from './ConversationList';
 
@@ -159,6 +163,12 @@ export default function Messenger({ onSignOut }: Props) {
 
   );
 
+  const [bubbleColorByKey, setBubbleColorByKey] = useState<Map<string, string>>(
+
+    () => new Map(),
+
+  );
+
   const [latestByConversation, setLatestByConversation] = useState<
 
     Map<string, LatestMessagePreview>
@@ -192,6 +202,12 @@ export default function Messenger({ onSignOut }: Props) {
   const canonicalConversationIdRef = useRef(new Map<string, string>());
 
   const messageSyncReadyRef = useRef(false);
+
+  const prevUnreadCountsRef = useRef<Map<string, number>>(new Map());
+
+  const alertedConversationAtRef = useRef<Map<string, string>>(new Map());
+
+  const unreadAlertsReadyRef = useRef(false);
 
   const realtimeSyncEpoch = useRealtimeSyncEpoch();
 
@@ -297,6 +313,8 @@ export default function Messenger({ onSignOut }: Props) {
       setSubToUsername(buildParticipantDirectory(profiles));
 
       setHandleToSub(buildHandleToSubDirectory(profiles));
+
+      setBubbleColorByKey(buildBubbleColorDirectory(profiles));
 
     } catch (err) {
 
@@ -479,6 +497,8 @@ export default function Messenger({ onSignOut }: Props) {
         resolveConversationId: (conversationId) =>
 
           canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
+
+        alertedConversationAt: alertedConversationAtRef.current,
 
       });
 
@@ -734,6 +754,8 @@ export default function Messenger({ onSignOut }: Props) {
 
               canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
 
+            alertedConversationAt: alertedConversationAtRef.current,
+
           });
 
           messageSyncReadyRef.current = true;
@@ -763,6 +785,8 @@ export default function Messenger({ onSignOut }: Props) {
           resolveConversationId: (conversationId) =>
 
             canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
+
+          alertedConversationAt: alertedConversationAtRef.current,
 
         });
 
@@ -980,15 +1004,91 @@ export default function Messenger({ onSignOut }: Props) {
 
   useEffect(() => {
 
+    if (!user) {
+
+      unreadAlertsReadyRef.current = false;
+
+      prevUnreadCountsRef.current = new Map();
+
+      alertedConversationAtRef.current = new Map();
+
+      return;
+
+    }
+
+    if (!unreadAlertsReadyRef.current) {
+
+      prevUnreadCountsRef.current = new Map(unreadCounts);
+
+      unreadAlertsReadyRef.current = true;
+
+      return;
+
+    }
+
+    processUnreadCountAlerts({
+
+      previousCounts: prevUnreadCountsRef.current,
+
+      nextCounts: unreadCounts,
+
+      latestByConversation,
+
+      conversations: new Map(mergedConversations.map((conversation) => [conversation.id, conversation])),
+
+      user,
+
+      subToUsername,
+
+      alertedConversationAt: alertedConversationAtRef.current,
+
+    });
+
+    prevUnreadCountsRef.current = new Map(unreadCounts);
+
+  }, [latestByConversation, mergedConversations, subToUsername, unreadCounts, user]);
+
+
+
+  useEffect(() => {
+
     setNotificationClickHandler((conversationId) => {
 
       handleSelectConversation(conversationId);
 
     });
 
+
+
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+
+      const data = event.data as { type?: string; conversationId?: string };
+
+      if (data?.type === 'open-conversation' && data.conversationId) {
+
+        handleSelectConversation(data.conversationId);
+
+      }
+
+    };
+
+    if ('serviceWorker' in navigator) {
+
+      navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
+
+    }
+
+
+
     return () => {
 
       setNotificationClickHandler(null);
+
+      if ('serviceWorker' in navigator) {
+
+        navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
+
+      }
 
       void clearUnreadIndicators();
 
@@ -1236,6 +1336,10 @@ export default function Messenger({ onSignOut }: Props) {
 
             subToUsername={subToUsername}
 
+            myMessageBubbleColor={user.messageBubbleColor}
+
+            bubbleColorByKey={bubbleColorByKey}
+
             chatBackRef={chatBackRef}
 
             onBack={() => {
@@ -1344,11 +1448,13 @@ export default function Messenger({ onSignOut }: Props) {
 
           onClose={() => setShowProfile(false)}
 
-          onSaved={(update) =>
+          onSaved={(update) => {
 
-            setUser((prev) => (prev ? { ...prev, ...update } : prev))
+            setUser((prev) => (prev ? { ...prev, ...update } : prev));
 
-          }
+            void reloadDirectory();
+
+          }}
 
         />
 

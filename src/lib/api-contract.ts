@@ -5,13 +5,14 @@ import { pickUserHandle } from './util';
  * When amplify/data/resource.ts changes, update this file and run tests.
  */
 export const SYNC_PROFILE_CONTRACT = {
-  mutationArgs: ['contactEmail'] as const,
+  mutationArgs: ['contactEmail', 'messageBubbleColor'] as const,
   resultFields: [
     'profileId',
     'username',
     'cognitoSub',
     'role',
     'contactEmail',
+    'messageBubbleColor',
   ] as const,
 } as const;
 
@@ -27,6 +28,7 @@ export type SyncProfilePayload = {
   cognitoSub: string;
   role: string;
   contactEmail?: string | null;
+  messageBubbleColor?: string | null;
 };
 
 type OutputsIntrospection = {
@@ -87,6 +89,11 @@ export function assertAmplifyOutputsMatchContract(
   if (!profileFields.includes('contactEmail')) {
     issues.push('UserProfile is missing contactEmail in amplify_outputs.json');
   }
+  if (!profileFields.includes('messageBubbleColor')) {
+    issues.push(
+      'UserProfile is missing messageBubbleColor in amplify_outputs.json',
+    );
+  }
 
   return issues;
 }
@@ -102,6 +109,7 @@ export function sessionUserFromSyncProfile(
   isAdmin: boolean;
   contactEmail: string | null;
   profileId: string | null;
+  messageBubbleColor: string | null;
 } {
   if (!data.cognitoSub?.trim()) {
     throw new Error('Profile sync returned no cognitoSub');
@@ -116,5 +124,6 @@ export function sessionUserFromSyncProfile(
     isAdmin: data.role === 'admin',
     contactEmail: data.contactEmail ?? null,
     profileId: data.profileId,
+    messageBubbleColor: data.messageBubbleColor ?? null,
   };
 }

@@ -544,9 +544,9 @@ export default function AuthGate({ children }: Props) {
 
       <AuthShell
 
-        title="Request an account"
+        title="Request account or password reset"
 
-        subtitle="Choose a username and enter your email. An administrator will review your request and reply with login details."
+        subtitle="New here or forgot your password? Enter your username and email. An administrator will review your request and reply with login details or a reset."
 
       >
 
@@ -704,7 +704,7 @@ export default function AuthGate({ children }: Props) {
 
         >
 
-          Create New Account
+          Create New or Forgot Password Account
 
         </button>
 

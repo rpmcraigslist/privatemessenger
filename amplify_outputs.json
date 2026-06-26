@@ -82,6 +82,13 @@
               "isRequired": false,
               "attributes": []
             },
+            "messageBubbleColor": {
+              "name": "messageBubbleColor",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
             "role": {
               "name": "role",
               "isArray": false,
@@ -617,6 +624,13 @@
               "type": "String",
               "isRequired": false,
               "attributes": []
+            },
+            "messageBubbleColor": {
+              "name": "messageBubbleColor",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
             }
           }
         }
@@ -791,6 +805,12 @@
           "arguments": {
             "contactEmail": {
               "name": "contactEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
+            },
+            "messageBubbleColor": {
+              "name": "messageBubbleColor",
               "isArray": false,
               "type": "String",
               "isRequired": false

@@ -10,6 +10,13 @@ import {
 } from '../lib/app-notifications';
 
 import {
+  DEFAULT_MESSAGE_BUBBLE_COLOR,
+  MESSAGE_BUBBLE_COLORS,
+  bubbleStyleForColor,
+  normalizeMessageBubbleColor,
+} from '../lib/message-bubble-colors';
+
+import {
   contactEmailError,
   formatUserHandle,
   normalizeContactEmail,
@@ -36,6 +43,11 @@ type Props = {
 
 export default function ProfileSettings({ user, onClose, onSaved }: Props) {
   const [contactEmail, setContactEmail] = useState(user.contactEmail ?? '');
+  const [messageBubbleColor, setMessageBubbleColor] = useState(
+    () =>
+      normalizeMessageBubbleColor(user.messageBubbleColor) ??
+      DEFAULT_MESSAGE_BUBBLE_COLOR,
+  );
   const [alertPrefs, setAlertPrefsState] = useState(getAlertPrefs);
   const [notifyError, setNotifyError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,11 +113,17 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
       const normalized = normalizeContactEmail(contactEmail);
       const saved = await syncMyProfile({
         contactEmail: normalized,
+        messageBubbleColor,
       });
 
       setContactEmail(saved.contactEmail ?? '');
+      setMessageBubbleColor(
+        normalizeMessageBubbleColor(saved.messageBubbleColor) ??
+          DEFAULT_MESSAGE_BUBBLE_COLOR,
+      );
       onSaved({
         contactEmail: saved.contactEmail,
+        messageBubbleColor: saved.messageBubbleColor,
       });
       onClose();
     } catch (err) {
@@ -172,6 +190,42 @@ export default function ProfileSettings({ user, onClose, onSaved }: Props) {
             with a link to open that message. Do not reply to those emails — they
             are sent automatically.
           </p>
+
+          <section className="space-y-3 border-t border-white/10 pt-4">
+            <div>
+              <h3 className="text-sm font-medium">Your message color</h3>
+              <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+                Pick the bubble color other people see on messages you send.
+              </p>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {MESSAGE_BUBBLE_COLORS.map((option) => {
+                const selected = messageBubbleColor === option.background;
+                const preview = bubbleStyleForColor(option.background, true);
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    title={option.label}
+                    aria-label={option.label}
+                    aria-pressed={selected}
+                    onClick={() => setMessageBubbleColor(option.background)}
+                    className={`flex h-11 items-center justify-center rounded-xl border text-xs font-medium transition ${
+                      selected
+                        ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40'
+                        : 'border-white/10 hover:border-white/25'
+                    }`}
+                    style={{
+                      background: preview.backgroundColor,
+                      color: preview.color,
+                    }}
+                  >
+                    Aa
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
           {isNotificationSupported() && (
             <section className="space-y-3 border-t border-white/10 pt-4">

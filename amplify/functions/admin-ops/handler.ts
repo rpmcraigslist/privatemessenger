@@ -116,6 +116,7 @@ type DirectoryEntry = {
   cognitoSub: string | null;
   displayName: string;
   avatarColor: string | null;
+  messageBubbleColor: string | null;
 };
 
 async function listUserDirectory(): Promise<DirectoryEntry[]> {
@@ -167,6 +168,7 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
       cognitoSub: string | null;
       displayName: string;
       avatarColor: string | null;
+      messageBubbleColor: string | null;
     }
   >();
   const bySub = new Map<string, (typeof byUsername extends Map<string, infer V> ? V : never)>();
@@ -192,6 +194,7 @@ async function listUserDirectory(): Promise<DirectoryEntry[]> {
       cognitoSub: profile.cognitoSub ?? null,
       displayName,
       avatarColor: profile.avatarColor ?? null,
+      messageBubbleColor: profile.messageBubbleColor ?? null,
     };
 
     const existingByUsername = byUsername.get(profile.username);

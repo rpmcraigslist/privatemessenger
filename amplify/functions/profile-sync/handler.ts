@@ -15,6 +15,10 @@ import {
   resolveContactEmailAfterSync,
 } from '../shared/profile-sync-logic';
 import {
+  DEFAULT_MESSAGE_BUBBLE_COLOR,
+  resolveMessageBubbleColorAfterSync,
+} from '../shared/message-bubble-colors';
+import {
   conversationIncludesUser,
   repairParticipantList,
 } from '../shared/participant-repair';
@@ -88,7 +92,8 @@ export const handler: Handler = async (event) => {
     throw new Error('Could not resolve username from Cognito profile');
   }
 
-  const { contactEmail: emailArg } = event.arguments;
+  const { contactEmail: emailArg, messageBubbleColor: bubbleColorArg } =
+    event.arguments;
   const isAdmin = isAdminGroupMember(event.identity);
   const client = await dataClientPromise;
 
@@ -96,6 +101,10 @@ export const handler: Handler = async (event) => {
   const contactEmail = resolveContactEmailAfterSync({
     existing: existing?.contactEmail,
     emailArg,
+  });
+  const messageBubbleColor = resolveMessageBubbleColorAfterSync({
+    existing: existing?.messageBubbleColor,
+    colorArg: bubbleColorArg,
   });
 
   const role =
@@ -111,6 +120,7 @@ export const handler: Handler = async (event) => {
         contactEmail,
         smsNotificationsEnabled: false,
         avatarColor: isAdmin ? '#00a884' : '#64b5f6',
+        messageBubbleColor: DEFAULT_MESSAGE_BUBBLE_COLOR,
       },
       { authMode: 'iam' },
     );
@@ -134,6 +144,7 @@ export const handler: Handler = async (event) => {
       sub,
       role,
       contactEmail,
+      messageBubbleColor,
     );
   }
 
@@ -144,6 +155,7 @@ export const handler: Handler = async (event) => {
       cognitoSub: sub,
       role,
       contactEmail,
+      messageBubbleColor,
     },
     { authMode: 'iam' },
   );
@@ -163,5 +175,6 @@ export const handler: Handler = async (event) => {
     sub,
     role,
     contactEmail,
+    messageBubbleColor,
   );
 };

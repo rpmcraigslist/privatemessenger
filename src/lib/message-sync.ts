@@ -19,7 +19,37 @@ export type IncomingMessageAlertContext = {
   subToUsername: Map<string, string>;
   knownMessageIds: Set<string>;
   resolveConversationId?: (conversationId: string) => string;
+  alertedConversationAt?: Map<string, string>;
 };
+
+export type UnreadCountAlertContext = {
+  previousCounts: Map<string, number>;
+  nextCounts: Map<string, number>;
+  latestByConversation: Map<string, { preview: string; at: string }>;
+  conversations: Map<string, ConversationModel>;
+  user: SessionUser;
+  subToUsername: Map<string, string>;
+  alertedConversationAt: Map<string, string>;
+};
+
+function resolveConversationId(
+  conversationId: string,
+  resolver?: (conversationId: string) => string,
+): string {
+  return resolver?.(conversationId) ?? conversationId;
+}
+
+function isViewingConversation(
+  messageConversationId: string,
+  selectedConversationId: string | null,
+  resolver?: (conversationId: string) => string,
+): boolean {
+  if (!selectedConversationId) return false;
+  return (
+    resolveConversationId(messageConversationId, resolver) ===
+    resolveConversationId(selectedConversationId, resolver)
+  );
+}
 
 /** Load every message the signed-in user can read (fallback when live sync stalls). */
 export async function fetchAllMessages(): Promise<MessageModel[]> {
@@ -54,7 +84,6 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
 
   for (const message of ctx.items) {
     if (ctx.knownMessageIds.has(message.id)) continue;
-    ctx.knownMessageIds.add(message.id);
     if (!message.conversationId) continue;
 
     if (
@@ -65,27 +94,43 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
         ctx.subToUsername,
       )
     ) {
+      ctx.knownMessageIds.add(message.id);
+      continue;
+    }
+
+    const resolvedConversationId = resolveConversationId(
+      message.conversationId,
+      ctx.resolveConversationId,
+    );
+    const resolvedSelectedId = ctx.selectedConversationId
+      ? resolveConversationId(ctx.selectedConversationId, ctx.resolveConversationId)
+      : null;
+    const tabHidden =
+      typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    const viewingSameChat =
+      !tabHidden &&
+      isViewingConversation(
+        message.conversationId,
+        ctx.selectedConversationId,
+        ctx.resolveConversationId,
+      );
+
+    if (viewingSameChat) {
+      ctx.knownMessageIds.add(message.id);
       continue;
     }
 
     if (
       !shouldAlertForIncomingMessage({
-        conversationId: ctx.resolveConversationId
-          ? ctx.resolveConversationId(message.conversationId)
-          : message.conversationId,
-        selectedConversationId: ctx.selectedConversationId
-          ? ctx.resolveConversationId
-            ? ctx.resolveConversationId(ctx.selectedConversationId)
-            : ctx.selectedConversationId
-          : null,
+        conversationId: resolvedConversationId,
+        selectedConversationId: resolvedSelectedId,
       })
     ) {
       continue;
     }
 
-    const resolvedConversationId = ctx.resolveConversationId
-      ? ctx.resolveConversationId(message.conversationId)
-      : message.conversationId;
+    ctx.knownMessageIds.add(message.id);
+
     const conversation =
       ctx.conversations.get(resolvedConversationId) ??
       ctx.conversations.get(message.conversationId);
@@ -104,6 +149,41 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
       conversationId: resolvedConversationId,
       title,
       body: messageListPreview(message),
+    });
+    ctx.alertedConversationAt?.set(resolvedConversationId, message.createdAt);
+  }
+}
+
+/** Backup alert path when unread counts increase (covers mobile poll + badge updates). */
+export function processUnreadCountAlerts(ctx: UnreadCountAlertContext): void {
+  for (const [conversationId, nextCount] of ctx.nextCounts) {
+    const previousCount = ctx.previousCounts.get(conversationId) ?? 0;
+    if (nextCount <= previousCount || nextCount <= 0) continue;
+
+    const latest = ctx.latestByConversation.get(conversationId);
+    if (!latest) continue;
+
+    const lastAlertAt = ctx.alertedConversationAt.get(conversationId);
+    if (lastAlertAt && lastAlertAt >= latest.at) continue;
+
+    ctx.alertedConversationAt.set(conversationId, latest.at);
+
+    const conversation = ctx.conversations.get(conversationId);
+    const title = conversation
+      ? conversationTitle(
+          conversation.participants,
+          conversation.name,
+          ctx.user.cognitoSub,
+          ctx.user.username,
+          ctx.subToUsername,
+        )
+      : 'New message';
+
+    playMessageSound();
+    showMessageNotification({
+      conversationId,
+      title,
+      body: latest.preview,
     });
   }
 }

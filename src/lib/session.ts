@@ -23,10 +23,12 @@ export type SessionUser = {
   isAdmin: boolean;
   contactEmail: string | null;
   profileId: string | null;
+  messageBubbleColor: string | null;
 };
 
 export type ProfileUpdate = {
   contactEmail: string | null;
+  messageBubbleColor?: string | null;
 };
 
 const LAST_HANDLE_KEY = 'messenger:lastHandle';
@@ -96,10 +98,14 @@ export async function syncMyProfile(
 
   const mutationArgs: {
     contactEmail?: string;
+    messageBubbleColor?: string;
   } = {};
 
   if (update) {
     mutationArgs.contactEmail = update.contactEmail ?? '';
+    if (update.messageBubbleColor !== undefined) {
+      mutationArgs.messageBubbleColor = update.messageBubbleColor ?? '';
+    }
   }
 
   const { data, errors } = await client.mutations.syncMyProfile(mutationArgs);

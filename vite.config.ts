@@ -35,6 +35,7 @@ export default defineConfig({
         // Don't precache the runtime backend config; it is fetched fresh.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallbackDenylist: [/^\/amplify_outputs\.json$/],
+        importScripts: ['notification-sw.js'],
       },
     }),
   ],

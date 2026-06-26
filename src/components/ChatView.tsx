@@ -31,6 +31,11 @@ import {
 
 } from '../lib/util';
 
+import {
+  bubbleStyleForColor,
+  resolveSenderBubbleColor,
+} from '../lib/message-bubble-colors';
+
 import Avatar from './Avatar';
 
 import ChatGroupPanel from './ChatGroupPanel';
@@ -58,6 +63,10 @@ type Props = {
   handleToSub: Map<string, string>;
 
   subToUsername: Map<string, string>;
+
+  myMessageBubbleColor: string | null;
+
+  bubbleColorByKey: Map<string, string>;
 
   chatBackRef?: MutableRefObject<ChatBackHandle | null>;
 
@@ -113,6 +122,10 @@ export default function ChatView({
   handleToSub,
 
   subToUsername,
+
+  myMessageBubbleColor,
+
+  bubbleColorByKey,
 
   chatBackRef,
 
@@ -1137,6 +1150,16 @@ export default function ChatView({
 
                     mine={mine}
 
+                    bubbleColor={
+                      mine
+                        ? myMessageBubbleColor
+                        : resolveSenderBubbleColor(
+                            m.senderUsername,
+                            bubbleColorByKey,
+                            subToUsername,
+                          )
+                    }
+
                     showSender={showSender}
 
                     subToUsername={subToUsername}
@@ -1433,6 +1456,8 @@ function Bubble({
 
   mine,
 
+  bubbleColor,
+
   showSender,
 
   subToUsername,
@@ -1452,6 +1477,8 @@ function Bubble({
   message: MessageModel;
 
   mine: boolean;
+
+  bubbleColor: string | null;
 
   showSender: boolean;
 
@@ -1519,6 +1546,10 @@ function Bubble({
 
 
 
+  const bubbleSurface = bubbleStyleForColor(bubbleColor, mine);
+
+
+
   return (
 
     <div className={`message-row ${mine ? 'message-row-self' : 'message-row-peer'} ${deleting ? 'opacity-50' : ''}`}>
@@ -1529,11 +1560,9 @@ function Bubble({
 
         style={{
 
-          backgroundColor: mine
+          backgroundColor: bubbleSurface.backgroundColor,
 
-            ? 'var(--color-bubble-out)'
-
-            : 'var(--color-bubble-in)',
+          color: bubbleSurface.color,
 
         }}
 
@@ -1689,7 +1718,7 @@ function Bubble({
 
           </button>
 
-          <span className="text-[10px] text-white/50">
+          <span className="text-[10px]" style={{ color: bubbleSurface.mutedColor }}>
 
             {formatTime(message.createdAt)}
 

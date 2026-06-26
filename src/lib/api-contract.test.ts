@@ -81,7 +81,7 @@ describe('profile-sync-logic', () => {
 
   it('buildSyncProfileResponse requires profileId', () => {
     expect(() =>
-      buildSyncProfileResponse('', 'paul', 'sub-paul', 'user', null),
+      buildSyncProfileResponse('', 'paul', 'sub-paul', 'user', null, '#005c4b'),
     ).toThrow(/not created/i);
   });
 });

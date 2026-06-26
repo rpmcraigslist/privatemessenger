@@ -13,6 +13,7 @@ const DEFAULT_PREFS: AlertPrefs = {
 };
 
 let audioContext: AudioContext | null = null;
+let messageAudio: HTMLAudioElement | null = null;
 let notificationClickHandler: ((conversationId: string) => void) | null = null;
 
 export function getAlertPrefs(): AlertPrefs {
@@ -70,6 +71,7 @@ export function setNotificationClickHandler(
 
 export function unlockNotificationSound(): void {
   if (typeof window === 'undefined') return;
+  preloadMessageSound();
   if (!audioContext) {
     const AudioCtx =
       window.AudioContext ??
@@ -114,11 +116,14 @@ export async function clearUnreadIndicators(): Promise<void> {
   }
 }
 
-export function playMessageSound(): void {
-  const prefs = getAlertPrefs();
-  if (!prefs.soundEnabled) return;
+function preloadMessageSound(): void {
+  if (typeof Audio === 'undefined') return;
+  if (messageAudio) return;
+  messageAudio = new Audio(createMessageChimeDataUri());
+  messageAudio.preload = 'auto';
+}
 
-  unlockNotificationSound();
+function playMessageSoundWithWebAudio(): void {
   if (!audioContext) return;
 
   const ctx = audioContext;
@@ -143,6 +148,24 @@ export function playMessageSound(): void {
   tone(1174.66, now + 0.1, 0.18);
 }
 
+export function playMessageSound(): void {
+  const prefs = getAlertPrefs();
+  if (!prefs.soundEnabled) return;
+
+  unlockNotificationSound();
+  preloadMessageSound();
+
+  if (messageAudio) {
+    messageAudio.currentTime = 0;
+    void messageAudio.play().catch(() => {
+      playMessageSoundWithWebAudio();
+    });
+    return;
+  }
+
+  playMessageSoundWithWebAudio();
+}
+
 export function showMessageNotification(options: {
   conversationId: string;
   title: string;
@@ -152,13 +175,33 @@ export function showMessageNotification(options: {
   if (!prefs.browserNotifications) return;
   if (!isNotificationSupported() || Notification.permission !== 'granted') return;
 
-  const notification = new Notification(options.title, {
+  void displayMessageNotification(options);
+}
+
+async function displayMessageNotification(options: {
+  conversationId: string;
+  title: string;
+  body: string;
+}): Promise<void> {
+  const payload: NotificationOptions = {
     body: options.body,
     tag: `message-${options.conversationId}`,
     icon: '/icon.svg',
     badge: '/icon.svg',
-  });
+    data: { conversationId: options.conversationId },
+  };
 
+  try {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(options.title, payload);
+      return;
+    }
+  } catch (err) {
+    console.warn('service worker notification failed', err);
+  }
+
+  const notification = new Notification(options.title, payload);
   notification.onclick = () => {
     window.focus();
     notificationClickHandler?.(options.conversationId);
@@ -172,9 +215,60 @@ export function shouldAlertForIncomingMessage(options: {
 }): boolean {
   if (typeof document === 'undefined') return false;
   if (document.visibilityState === 'hidden') return true;
+  if (!options.selectedConversationId) return true;
   return options.conversationId !== options.selectedConversationId;
 }
 
 function formatBadgeCount(count: number): string {
   return count > 99 ? '99+' : String(count);
+}
+
+/** Short WAV chime — works on mobile browsers where Web Audio is blocked. */
+function createMessageChimeDataUri(): string {
+  const sampleRate = 22050;
+  const durationSeconds = 0.35;
+  const sampleCount = Math.floor(sampleRate * durationSeconds);
+  const bytesPerSample = 2;
+  const dataSize = sampleCount * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  for (let index = 0; index < sampleCount; index += 1) {
+    const time = index / sampleRate;
+    const first = Math.sin(2 * Math.PI * 880 * time) * Math.exp(-time * 8);
+    const second =
+      time > 0.1
+        ? Math.sin(2 * Math.PI * 1174.66 * (time - 0.1)) * Math.exp(-(time - 0.1) * 6)
+        : 0;
+    const sample = Math.max(-1, Math.min(1, first * 0.35 + second * 0.35));
+    view.setInt16(44 + index * bytesPerSample, sample * 0x7fff, true);
+  }
+
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]!);
+  }
+
+  return `data:audio/wav;base64,${btoa(binary)}`;
 }

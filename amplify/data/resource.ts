@@ -16,6 +16,7 @@ const schema = a
         cognitoSub: a.string(),
         displayName: a.string(),
         avatarColor: a.string(),
+        messageBubbleColor: a.string(),
         role: a.enum(['admin', 'user']),
         phoneNumber: a.string(),
         smsNotificationsEnabled: a.boolean(),
@@ -189,6 +190,7 @@ const schema = a
       cognitoSub: a.string().required(),
       role: a.string().required(),
       contactEmail: a.string(),
+      messageBubbleColor: a.string(),
     }),
 
     DirectoryUser: a.customType({
@@ -197,6 +199,7 @@ const schema = a
       cognitoSub: a.string(),
       displayName: a.string(),
       avatarColor: a.string(),
+      messageBubbleColor: a.string(),
     }),
 
     bootstrapRequired: a
@@ -323,6 +326,7 @@ const schema = a
       .mutation()
       .arguments({
         contactEmail: a.string(),
+        messageBubbleColor: a.string(),
       })
       .returns(a.ref('SyncProfileResult'))
       .authorization((allow) => [allow.authenticated()])

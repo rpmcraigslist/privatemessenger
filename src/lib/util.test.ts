@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  dedupeDirectConversations,
   dedupeUserProfiles,
   isMessageFromSelf,
   isSameMessengerUser,
@@ -64,36 +63,6 @@ describe('repairParticipantSubs', () => {
       handleToSub,
     );
     expect(result.sort()).toEqual(['sub-a', 'sub-b']);
-  });
-});
-
-describe('dedupeDirectConversations', () => {
-  const handleToSub = new Map([['lena', 'sub-lena']]);
-
-  it('keeps one 1:1 thread when legacy and current participant ids refer to the same person', () => {
-    const stale = {
-      id: 'stale',
-      isGroup: false,
-      participants: ['sub-paul', 'lena'],
-      lastMessageAt: '2026-06-20T11:00:00.000Z',
-    };
-    const current = {
-      id: 'current',
-      isGroup: false,
-      participants: ['sub-paul', 'sub-lena'],
-      lastMessageAt: '2026-06-20T12:00:00.000Z',
-    };
-
-    const result = dedupeDirectConversations(
-      [stale, current],
-      (conversation) => conversation.lastMessageAt ?? '',
-      'paul',
-      'sub-paul',
-      handleToSub,
-    );
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.id).toBe('current');
   });
 });
 

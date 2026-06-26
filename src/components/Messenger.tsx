@@ -10,8 +10,6 @@ import {
 
   syncUnreadIndicators,
 
-  unlockNotificationSound,
-
 } from '../lib/app-notifications';
 
 import { loadUserDirectory } from '../lib/directory';
@@ -36,11 +34,13 @@ import {
 
 import {
 
+  createMessageAlertState,
+
   fetchAllMessages,
 
   processIncomingMessageAlerts,
 
-  processUnreadCountAlerts,
+  useNotificationSoundUnlock,
 
   useRealtimeSyncEpoch,
 
@@ -55,10 +55,6 @@ import {
   buildParticipantDirectory,
 
   buildHandleToSubDirectory,
-
-  buildCanonicalConversationIdMap,
-
-  dedupeDirectConversations,
 
   messageListPreview,
 
@@ -195,21 +191,13 @@ export default function Messenger({ onSignOut }: Props) {
 
   const conversationsRef = useRef<Map<string, ConversationModel>>(new Map());
 
-  const knownMessageIdsRef = useRef(new Set<string>());
+  const alertStateRef = useRef(createMessageAlertState());
 
   const pendingOptimisticMessagesRef = useRef(new Map<string, MessageModel>());
 
-  const canonicalConversationIdRef = useRef(new Map<string, string>());
-
-  const messageSyncReadyRef = useRef(false);
-
-  const prevUnreadCountsRef = useRef<Map<string, number>>(new Map());
-
-  const alertedConversationAtRef = useRef<Map<string, string>>(new Map());
-
-  const unreadAlertsReadyRef = useRef(false);
-
   const realtimeSyncEpoch = useRealtimeSyncEpoch();
+
+  useNotificationSoundUnlock();
 
   const chatBackRef = useRef<ChatBackHandle | null>(null);
 
@@ -482,7 +470,9 @@ export default function Messenger({ onSignOut }: Props) {
 
         items,
 
-        seedOnly: !messageSyncReadyRef.current,
+        markBaselineComplete: true,
+
+        alertState: alertStateRef.current,
 
         user: userRef.current,
 
@@ -492,17 +482,7 @@ export default function Messenger({ onSignOut }: Props) {
 
         subToUsername: subToUsernameRef.current,
 
-        knownMessageIds: knownMessageIdsRef.current,
-
-        resolveConversationId: (conversationId) =>
-
-          canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
-
-        alertedConversationAt: alertedConversationAtRef.current,
-
       });
-
-      messageSyncReadyRef.current = true;
 
     } catch (err) {
 
@@ -550,50 +530,6 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-  useEffect(() => {
-
-    if (!user) {
-
-      canonicalConversationIdRef.current = new Map();
-
-      return;
-
-    }
-
-    canonicalConversationIdRef.current = buildCanonicalConversationIdMap(
-
-      conversations,
-
-      (conversation) => conversation.lastMessageAt ?? conversation.createdAt,
-
-      user.username,
-
-      user.cognitoSub,
-
-      handleToSub,
-
-    );
-
-  }, [conversations, handleToSub, user]);
-
-
-
-  useEffect(() => {
-
-    if (!user || !selectedId) return;
-
-    const canonical =
-
-      canonicalConversationIdRef.current.get(selectedId) ?? selectedId;
-
-    if (canonical === selectedId) return;
-
-    setSelectedId(canonical);
-
-  }, [conversations, handleToSub, selectedId, user]);
-
-
-
   const mergedConversations = useMemo(() => {
 
     const byId = new Map(conversations.map((conversation) => [conversation.id, conversation]));
@@ -608,37 +544,9 @@ export default function Messenger({ onSignOut }: Props) {
 
     }
 
-    const merged = [...byId.values()];
+    return [...byId.values()];
 
-    if (!user) return merged;
-
-    return dedupeDirectConversations(
-
-      merged,
-
-      (conversation) => conversationActivityAt(conversation, latestByConversation),
-
-      user.username,
-
-      user.cognitoSub,
-
-      handleToSub,
-
-    );
-
-  }, [
-
-    conversations,
-
-    handleToSub,
-
-    latestByConversation,
-
-    optimisticConversations,
-
-    user,
-
-  ]);
+  }, [conversations, optimisticConversations]);
 
 
 
@@ -646,11 +554,17 @@ export default function Messenger({ onSignOut }: Props) {
 
     if (!user) return;
 
-    knownMessageIdsRef.current.clear();
+    alertStateRef.current = createMessageAlertState();
 
     pendingOptimisticMessagesRef.current.clear();
 
-    messageSyncReadyRef.current = false;
+  }, [user?.cognitoSub]);
+
+
+
+  useEffect(() => {
+
+    if (!user) return;
 
 
 
@@ -674,12 +588,6 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-        const canonicalConversationId = (conversationId: string) =>
-
-          canonicalConversationIdRef.current.get(conversationId) ?? conversationId;
-
-
-
         const merged = mergeMessages([], items);
 
 
@@ -692,9 +600,7 @@ export default function Messenger({ onSignOut }: Props) {
 
             if (!message.conversationId) continue;
 
-            const canonicalId = canonicalConversationId(message.conversationId);
-
-            const current = next.get(canonicalId);
+            const current = next.get(message.conversationId);
 
             if (
 
@@ -708,7 +614,7 @@ export default function Messenger({ onSignOut }: Props) {
 
             }
 
-            next.set(canonicalId, {
+            next.set(message.conversationId, {
 
               preview: messageListPreview(message),
 
@@ -730,47 +636,13 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-        if (!messageSyncReadyRef.current) {
-
-          if (!isSynced) return;
-
-          processIncomingMessageAlerts({
-
-            items,
-
-            seedOnly: true,
-
-            user: currentUser,
-
-            selectedConversationId: selectedIdRef.current,
-
-            conversations: conversationsRef.current,
-
-            subToUsername: subToUsernameRef.current,
-
-            knownMessageIds: knownMessageIdsRef.current,
-
-            resolveConversationId: (conversationId) =>
-
-              canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
-
-            alertedConversationAt: alertedConversationAtRef.current,
-
-          });
-
-          messageSyncReadyRef.current = true;
-
-          return;
-
-        }
-
-
-
         processIncomingMessageAlerts({
 
           items,
 
-          seedOnly: false,
+          markBaselineComplete: isSynced,
+
+          alertState: alertStateRef.current,
 
           user: currentUser,
 
@@ -779,14 +651,6 @@ export default function Messenger({ onSignOut }: Props) {
           conversations: conversationsRef.current,
 
           subToUsername: subToUsernameRef.current,
-
-          knownMessageIds: knownMessageIdsRef.current,
-
-          resolveConversationId: (conversationId) =>
-
-            canonicalConversationIdRef.current.get(conversationId) ?? conversationId,
-
-          alertedConversationAt: alertedConversationAtRef.current,
 
         });
 
@@ -910,7 +774,7 @@ export default function Messenger({ onSignOut }: Props) {
 
         : { ...message, createdAt: new Date().toISOString() };
 
-    knownMessageIdsRef.current.add(normalized.id);
+    alertStateRef.current.alertedMessageIds.add(normalized.id);
 
     pendingOptimisticMessagesRef.current.set(normalized.id, normalized);
 
@@ -956,7 +820,7 @@ export default function Messenger({ onSignOut }: Props) {
 
   const handleMessageDeleted = useCallback((messageId: string) => {
 
-    knownMessageIdsRef.current.delete(messageId);
+    alertStateRef.current.alertedMessageIds.delete(messageId);
 
     pendingOptimisticMessagesRef.current.delete(messageId);
 
@@ -999,54 +863,6 @@ export default function Messenger({ onSignOut }: Props) {
     void syncUnreadIndicators(totalUnread);
 
   }, [totalUnread]);
-
-
-
-  useEffect(() => {
-
-    if (!user) {
-
-      unreadAlertsReadyRef.current = false;
-
-      prevUnreadCountsRef.current = new Map();
-
-      alertedConversationAtRef.current = new Map();
-
-      return;
-
-    }
-
-    if (!unreadAlertsReadyRef.current) {
-
-      prevUnreadCountsRef.current = new Map(unreadCounts);
-
-      unreadAlertsReadyRef.current = true;
-
-      return;
-
-    }
-
-    processUnreadCountAlerts({
-
-      previousCounts: prevUnreadCountsRef.current,
-
-      nextCounts: unreadCounts,
-
-      latestByConversation,
-
-      conversations: new Map(mergedConversations.map((conversation) => [conversation.id, conversation])),
-
-      user,
-
-      subToUsername,
-
-      alertedConversationAt: alertedConversationAtRef.current,
-
-    });
-
-    prevUnreadCountsRef.current = new Map(unreadCounts);
-
-  }, [latestByConversation, mergedConversations, subToUsername, unreadCounts, user]);
 
 
 
@@ -1098,22 +914,6 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-  useEffect(() => {
-
-    function unlockOnInteraction() {
-
-      unlockNotificationSound();
-
-    }
-
-    window.addEventListener('pointerdown', unlockOnInteraction, { once: true });
-
-    return () => window.removeEventListener('pointerdown', unlockOnInteraction);
-
-  }, []);
-
-
-
   const selected = useMemo(
 
     () => mergedConversations.find((c) => c.id === selectedId) ?? null,
@@ -1128,27 +928,9 @@ export default function Messenger({ onSignOut }: Props) {
 
     if (!selectedId) return [];
 
-    const selectedCanonical =
-
-      canonicalConversationIdRef.current.get(selectedId) ?? selectedId;
-
-
-
     return allMessages
 
-      .filter((message) => {
-
-        if (!message.conversationId) return false;
-
-        const messageCanonical =
-
-          canonicalConversationIdRef.current.get(message.conversationId) ??
-
-          message.conversationId;
-
-        return messageCanonical === selectedCanonical;
-
-      })
+      .filter((message) => message.conversationId === selectedId)
 
       .sort(
 
@@ -1158,7 +940,7 @@ export default function Messenger({ onSignOut }: Props) {
 
       );
 
-  }, [allMessages, conversations, handleToSub, selectedId, user]);
+  }, [allMessages, selectedId]);
 
 
 

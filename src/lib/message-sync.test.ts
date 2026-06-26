@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { ConversationModel, MessageModel } from './amplify';
 import {
+  createMessageAlertState,
   processIncomingMessageAlerts,
-  processUnreadCountAlerts,
 } from './message-sync';
 import type { SessionUser } from './session';
 
@@ -25,6 +25,7 @@ vi.mock('./app-notifications', () => ({
     }
     return options.conversationId !== options.selectedConversationId;
   },
+  unlockNotificationSound: vi.fn(),
 }));
 
 const user: SessionUser = {
@@ -36,14 +37,19 @@ const user: SessionUser = {
   messageBubbleColor: null,
 };
 
-function message(id: string, conversationId: string, sender = 'bob'): MessageModel {
+function message(
+  id: string,
+  conversationId: string,
+  sender = 'bob',
+  createdAt = '2026-06-20T12:00:00.000Z',
+): MessageModel {
   return {
     id,
     conversationId,
     senderUsername: sender,
     participantUsernames: [user.cognitoSub, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'],
-    createdAt: '2026-06-20T12:00:00.000Z',
-    updatedAt: '2026-06-20T12:00:00.000Z',
+    createdAt,
+    updatedAt: createdAt,
   } as MessageModel;
 }
 
@@ -57,64 +63,96 @@ describe('processIncomingMessageAlerts', () => {
     });
   });
 
-  it('alerts for a new message in another chat', () => {
-    const knownMessageIds = new Set<string>();
+  it('does not alert for messages in the login baseline', () => {
+    const alertState = createMessageAlertState();
+    establishBaseline(alertState, [message('m1', 'conv-b')]);
+
     processIncomingMessageAlerts({
       items: [message('m1', 'conv-b')],
-      seedOnly: false,
+      alertState,
       user,
       selectedConversationId: 'conv-a',
       conversations: new Map<string, ConversationModel>(),
       subToUsername: new Map(),
-      knownMessageIds,
+    });
+
+    expect(playMessageSound).not.toHaveBeenCalled();
+  });
+
+  it('alerts for a new message after baseline is established', () => {
+    const alertState = createMessageAlertState();
+    establishBaseline(alertState, [message('old', 'conv-b', 'bob', '2026-06-20T11:00:00.000Z')]);
+
+    processIncomingMessageAlerts({
+      items: [message('m1', 'conv-b')],
+      alertState,
+      user,
+      selectedConversationId: 'conv-a',
+      conversations: new Map<string, ConversationModel>(),
+      subToUsername: new Map(),
     });
 
     expect(playMessageSound).toHaveBeenCalledTimes(1);
-    expect(showMessageNotification).toHaveBeenCalledTimes(1);
-    expect(knownMessageIds.has('m1')).toBe(true);
+    expect(showMessageNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: 'm1',
+        conversationId: 'conv-b',
+      }),
+    );
   });
 
   it('does not alert while viewing the same chat', () => {
-    const knownMessageIds = new Set<string>();
+    const alertState = createMessageAlertState();
+    establishBaseline(alertState, []);
+
     processIncomingMessageAlerts({
       items: [message('m1', 'conv-a')],
-      seedOnly: false,
+      alertState,
       user,
       selectedConversationId: 'conv-a',
       conversations: new Map<string, ConversationModel>(),
       subToUsername: new Map(),
-      knownMessageIds,
     });
 
     expect(playMessageSound).not.toHaveBeenCalled();
-    expect(knownMessageIds.has('m1')).toBe(true);
+    expect(alertState.alertedMessageIds.has('m1')).toBe(true);
   });
 
-  it('retries alert after a message was seen in another chat without notifying', () => {
-    const knownMessageIds = new Set<string>();
+  it('keeps alerting new messages after token-style resync without re-baselining', () => {
+    const alertState = createMessageAlertState();
+    establishBaseline(alertState, [message('old', 'conv-b')]);
 
     processIncomingMessageAlerts({
-      items: [message('m1', 'conv-b')],
-      seedOnly: false,
+      items: [message('m1', 'conv-b'), message('m2', 'conv-b', 'bob', '2026-06-20T12:01:00.000Z')],
+      alertState,
       user,
       selectedConversationId: 'conv-a',
       conversations: new Map<string, ConversationModel>(),
       subToUsername: new Map(),
-      knownMessageIds,
     });
-    expect(playMessageSound).toHaveBeenCalledTimes(1);
+    expect(playMessageSound).toHaveBeenCalledTimes(2);
     playMessageSound.mockClear();
 
     processIncomingMessageAlerts({
-      items: [message('m1', 'conv-b')],
-      seedOnly: false,
+      items: [message('m1', 'conv-b'), message('m2', 'conv-b', 'bob', '2026-06-20T12:01:00.000Z')],
+      markBaselineComplete: true,
+      alertState,
       user,
       selectedConversationId: 'conv-a',
       conversations: new Map<string, ConversationModel>(),
       subToUsername: new Map(),
-      knownMessageIds,
     });
     expect(playMessageSound).not.toHaveBeenCalled();
+
+    processIncomingMessageAlerts({
+      items: [message('m3', 'conv-b', 'bob', '2026-06-20T12:02:00.000Z')],
+      alertState,
+      user,
+      selectedConversationId: 'conv-a',
+      conversations: new Map<string, ConversationModel>(),
+      subToUsername: new Map(),
+    });
+    expect(playMessageSound).toHaveBeenCalledTimes(1);
   });
 
   it('alerts when the tab is hidden even if that chat is selected', () => {
@@ -122,56 +160,33 @@ describe('processIncomingMessageAlerts', () => {
       configurable: true,
       value: 'hidden',
     });
-    const knownMessageIds = new Set<string>();
+    const alertState = createMessageAlertState();
+    establishBaseline(alertState, []);
 
     processIncomingMessageAlerts({
       items: [message('m1', 'conv-a')],
-      seedOnly: false,
+      alertState,
       user,
       selectedConversationId: 'conv-a',
       conversations: new Map<string, ConversationModel>(),
       subToUsername: new Map(),
-      knownMessageIds,
     });
 
     expect(playMessageSound).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('processUnreadCountAlerts', () => {
-  beforeEach(() => {
-    playMessageSound.mockClear();
-    showMessageNotification.mockClear();
+function establishBaseline(
+  alertState: ReturnType<typeof createMessageAlertState>,
+  items: MessageModel[],
+): void {
+  processIncomingMessageAlerts({
+    items,
+    markBaselineComplete: true,
+    alertState,
+    user,
+    selectedConversationId: null,
+    conversations: new Map<string, ConversationModel>(),
+    subToUsername: new Map(),
   });
-
-  it('alerts when unread count increases for a conversation', () => {
-    processUnreadCountAlerts({
-      previousCounts: new Map([['conv-b', 0]]),
-      nextCounts: new Map([['conv-b', 1]]),
-      latestByConversation: new Map([
-        ['conv-b', { preview: 'Hello there', at: '2026-06-20T12:00:00.000Z' }],
-      ]),
-      conversations: new Map([
-        [
-          'conv-b',
-          {
-            id: 'conv-b',
-            participants: [user.cognitoSub, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'],
-            isGroup: false,
-          } as ConversationModel,
-        ],
-      ]),
-      user,
-      subToUsername: new Map(),
-      alertedConversationAt: new Map(),
-    });
-
-    expect(playMessageSound).toHaveBeenCalledTimes(1);
-    expect(showMessageNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 'conv-b',
-        body: 'Hello there',
-      }),
-    );
-  });
-});
+}

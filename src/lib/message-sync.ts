@@ -6,49 +6,43 @@ import {
   playMessageSound,
   shouldAlertForIncomingMessage,
   showMessageNotification,
+  unlockNotificationSound,
 } from './app-notifications';
 import type { SessionUser } from './session';
 import { conversationTitle, isSameMessengerUser, messageListPreview } from './util';
 
+/** Tracks which messages existed at first sync vs which have already triggered an alert. */
+export type MessageAlertState = {
+  baselineMessageIds: Set<string>;
+  alertedMessageIds: Set<string>;
+  baselineReady: boolean;
+};
+
+export function createMessageAlertState(): MessageAlertState {
+  return {
+    baselineMessageIds: new Set(),
+    alertedMessageIds: new Set(),
+    baselineReady: false,
+  };
+}
+
 export type IncomingMessageAlertContext = {
   items: MessageModel[];
-  seedOnly: boolean;
+  alertState: MessageAlertState;
+  /** True when the snapshot is complete (initial sync or server poll). */
+  markBaselineComplete?: boolean;
   user: SessionUser;
   selectedConversationId: string | null;
   conversations: Map<string, ConversationModel>;
   subToUsername: Map<string, string>;
-  knownMessageIds: Set<string>;
-  resolveConversationId?: (conversationId: string) => string;
-  alertedConversationAt?: Map<string, string>;
 };
-
-export type UnreadCountAlertContext = {
-  previousCounts: Map<string, number>;
-  nextCounts: Map<string, number>;
-  latestByConversation: Map<string, { preview: string; at: string }>;
-  conversations: Map<string, ConversationModel>;
-  user: SessionUser;
-  subToUsername: Map<string, string>;
-  alertedConversationAt: Map<string, string>;
-};
-
-function resolveConversationId(
-  conversationId: string,
-  resolver?: (conversationId: string) => string,
-): string {
-  return resolver?.(conversationId) ?? conversationId;
-}
 
 function isViewingConversation(
   messageConversationId: string,
   selectedConversationId: string | null,
-  resolver?: (conversationId: string) => string,
 ): boolean {
   if (!selectedConversationId) return false;
-  return (
-    resolveConversationId(messageConversationId, resolver) ===
-    resolveConversationId(selectedConversationId, resolver)
-  );
+  return messageConversationId === selectedConversationId;
 }
 
 /** Load every message the signed-in user can read (fallback when live sync stalls). */
@@ -73,18 +67,32 @@ export async function fetchAllMessages(): Promise<MessageModel[]> {
   return merged;
 }
 
-/** Play sound / show browser notification for newly seen incoming messages. */
-export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): void {
-  if (ctx.seedOnly) {
-    for (const message of ctx.items) {
-      ctx.knownMessageIds.add(message.id);
+function establishAlertBaseline(
+  state: MessageAlertState,
+  items: MessageModel[],
+): void {
+  for (const message of items) {
+    if (message.id) {
+      state.baselineMessageIds.add(message.id);
     }
+  }
+  state.baselineReady = true;
+}
+
+/** Play sound / show browser notification for newly arrived incoming messages. */
+export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): void {
+  if (!ctx.alertState.baselineReady) {
+    if (!ctx.markBaselineComplete) {
+      return;
+    }
+    establishAlertBaseline(ctx.alertState, ctx.items);
     return;
   }
 
   for (const message of ctx.items) {
-    if (ctx.knownMessageIds.has(message.id)) continue;
-    if (!message.conversationId) continue;
+    if (!message.id || !message.conversationId) continue;
+    if (ctx.alertState.baselineMessageIds.has(message.id)) continue;
+    if (ctx.alertState.alertedMessageIds.has(message.id)) continue;
 
     if (
       isSameMessengerUser(
@@ -94,46 +102,33 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
         ctx.subToUsername,
       )
     ) {
-      ctx.knownMessageIds.add(message.id);
+      ctx.alertState.alertedMessageIds.add(message.id);
       continue;
     }
 
-    const resolvedConversationId = resolveConversationId(
-      message.conversationId,
-      ctx.resolveConversationId,
-    );
-    const resolvedSelectedId = ctx.selectedConversationId
-      ? resolveConversationId(ctx.selectedConversationId, ctx.resolveConversationId)
-      : null;
     const tabHidden =
       typeof document !== 'undefined' && document.visibilityState === 'hidden';
     const viewingSameChat =
       !tabHidden &&
-      isViewingConversation(
-        message.conversationId,
-        ctx.selectedConversationId,
-        ctx.resolveConversationId,
-      );
+      isViewingConversation(message.conversationId, ctx.selectedConversationId);
 
     if (viewingSameChat) {
-      ctx.knownMessageIds.add(message.id);
+      ctx.alertState.alertedMessageIds.add(message.id);
       continue;
     }
 
     if (
       !shouldAlertForIncomingMessage({
-        conversationId: resolvedConversationId,
-        selectedConversationId: resolvedSelectedId,
+        conversationId: message.conversationId,
+        selectedConversationId: ctx.selectedConversationId,
       })
     ) {
       continue;
     }
 
-    ctx.knownMessageIds.add(message.id);
+    ctx.alertState.alertedMessageIds.add(message.id);
 
-    const conversation =
-      ctx.conversations.get(resolvedConversationId) ??
-      ctx.conversations.get(message.conversationId);
+    const conversation = ctx.conversations.get(message.conversationId);
     const title = conversation
       ? conversationTitle(
           conversation.participants,
@@ -146,44 +141,10 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
 
     playMessageSound();
     showMessageNotification({
-      conversationId: resolvedConversationId,
+      messageId: message.id,
+      conversationId: message.conversationId,
       title,
       body: messageListPreview(message),
-    });
-    ctx.alertedConversationAt?.set(resolvedConversationId, message.createdAt);
-  }
-}
-
-/** Backup alert path when unread counts increase (covers mobile poll + badge updates). */
-export function processUnreadCountAlerts(ctx: UnreadCountAlertContext): void {
-  for (const [conversationId, nextCount] of ctx.nextCounts) {
-    const previousCount = ctx.previousCounts.get(conversationId) ?? 0;
-    if (nextCount <= previousCount || nextCount <= 0) continue;
-
-    const latest = ctx.latestByConversation.get(conversationId);
-    if (!latest) continue;
-
-    const lastAlertAt = ctx.alertedConversationAt.get(conversationId);
-    if (lastAlertAt && lastAlertAt >= latest.at) continue;
-
-    ctx.alertedConversationAt.set(conversationId, latest.at);
-
-    const conversation = ctx.conversations.get(conversationId);
-    const title = conversation
-      ? conversationTitle(
-          conversation.participants,
-          conversation.name,
-          ctx.user.cognitoSub,
-          ctx.user.username,
-          ctx.subToUsername,
-        )
-      : 'New message';
-
-    playMessageSound();
-    showMessageNotification({
-      conversationId,
-      title,
-      body: latest.preview,
     });
   }
 }
@@ -250,4 +211,26 @@ export function usePeriodicMessageRefresh(
     const timer = window.setInterval(tick, intervalMs);
     return () => window.clearInterval(timer);
   }, [enabled, intervalMs, refresh]);
+}
+
+/** Keep mobile audio unlocked after the first user gesture. */
+export function useNotificationSoundUnlock(): void {
+  useEffect(() => {
+    const unlock = () => unlockNotificationSound();
+
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('touchstart', unlock, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        unlock();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
 }

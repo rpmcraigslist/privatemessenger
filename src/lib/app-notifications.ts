@@ -13,7 +13,6 @@ const DEFAULT_PREFS: AlertPrefs = {
 };
 
 let audioContext: AudioContext | null = null;
-let messageAudio: HTMLAudioElement | null = null;
 let notificationClickHandler: ((conversationId: string) => void) | null = null;
 
 export function getAlertPrefs(): AlertPrefs {
@@ -71,7 +70,6 @@ export function setNotificationClickHandler(
 
 export function unlockNotificationSound(): void {
   if (typeof window === 'undefined') return;
-  preloadMessageSound();
   if (!audioContext) {
     const AudioCtx =
       window.AudioContext ??
@@ -116,13 +114,6 @@ export async function clearUnreadIndicators(): Promise<void> {
   }
 }
 
-function preloadMessageSound(): void {
-  if (typeof Audio === 'undefined') return;
-  if (messageAudio) return;
-  messageAudio = new Audio(createMessageChimeDataUri());
-  messageAudio.preload = 'auto';
-}
-
 function playMessageSoundWithWebAudio(): void {
   if (!audioContext) return;
 
@@ -153,20 +144,16 @@ export function playMessageSound(): void {
   if (!prefs.soundEnabled) return;
 
   unlockNotificationSound();
-  preloadMessageSound();
 
-  if (messageAudio) {
-    messageAudio.currentTime = 0;
-    void messageAudio.play().catch(() => {
-      playMessageSoundWithWebAudio();
-    });
-    return;
-  }
-
-  playMessageSoundWithWebAudio();
+  const audio = new Audio(createMessageChimeDataUri());
+  audio.preload = 'auto';
+  void audio.play().catch(() => {
+    playMessageSoundWithWebAudio();
+  });
 }
 
 export function showMessageNotification(options: {
+  messageId: string;
   conversationId: string;
   title: string;
   body: string;
@@ -179,13 +166,15 @@ export function showMessageNotification(options: {
 }
 
 async function displayMessageNotification(options: {
+  messageId: string;
   conversationId: string;
   title: string;
   body: string;
 }): Promise<void> {
   const payload: NotificationOptions = {
     body: options.body,
-    tag: `message-${options.conversationId}`,
+    tag: `message-${options.messageId}`,
+    renotify: true,
     icon: '/icon.svg',
     badge: '/icon.svg',
     data: { conversationId: options.conversationId },

@@ -653,6 +653,32 @@
             }
           }
         },
+        "DirectoryUser": {
+          "name": "DirectoryUser",
+          "fields": {
+            "id": { "name": "id", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
+            "username": { "name": "username", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
+            "cognitoSub": { "name": "cognitoSub", "isArray": false, "type": "String", "isRequired": false, "attributes": [] },
+            "displayName": { "name": "displayName", "isArray": false, "type": "String", "isRequired": false, "attributes": [] },
+            "avatarColor": { "name": "avatarColor", "isArray": false, "type": "String", "isRequired": false, "attributes": [] },
+            "messageBubbleColor": { "name": "messageBubbleColor", "isArray": false, "type": "String", "isRequired": false, "attributes": [] }
+          }
+        },
+        "AdminAuditMessengerResult": {
+          "name": "AdminAuditMessengerResult",
+          "fields": {
+            "duplicateProfileHandles": { "name": "duplicateProfileHandles", "isArray": true, "type": "String", "isRequired": true, "attributes": [], "isArrayNullable": true }
+          }
+        },
+        "AdminPurgeDirectChatResult": {
+          "name": "AdminPurgeDirectChatResult",
+          "fields": {
+            "usernameA": { "name": "usernameA", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
+            "usernameB": { "name": "usernameB", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
+            "deletedMessages": { "name": "deletedMessages", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] },
+            "deletedConversations": { "name": "deletedConversations", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] }
+          }
+        },
         "ReadCursorRow": {
           "name": "ReadCursorRow",
           "fields": {
@@ -849,6 +875,28 @@
             "nonModel": "AdminClearMessagesResult"
           },
           "isRequired": false
+        },
+        "adminPurgeDirectChat": {
+          "name": "adminPurgeDirectChat",
+          "isArray": false,
+          "type": {
+            "nonModel": "AdminPurgeDirectChatResult"
+          },
+          "isRequired": false,
+          "arguments": {
+            "usernameA": {
+              "name": "usernameA",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            },
+            "usernameB": {
+              "name": "usernameB",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            }
+          }
         },
         "deleteMyMessage": {
           "name": "deleteMyMessage",

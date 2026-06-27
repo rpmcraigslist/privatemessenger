@@ -7,8 +7,6 @@ import {
   deleteReadStatesForIdentity,
 } from './messenger-cleanup';
 import {
-  consolidateUserProfiles,
-  ensureProfileForCognitoUser,
   isValidMessengerHandle,
   type DataClient,
 } from './profile-consolidation';
@@ -57,14 +55,6 @@ export type PurgeUserMessengerResult = {
   deletedMessages: number;
   deletedConversations: number;
   updatedGroupConversations: number;
-};
-
-export type ReconcileMessengerResult = {
-  profilesConsolidated: number;
-  orphanProfilesRemoved: number;
-  duplicateConversationsRemoved: number;
-  messagesRemoved: number;
-  conversationsNormalized: number;
 };
 
 export function buildUserParticipantIdentity(
@@ -506,162 +496,5 @@ export async function purgeUserMessengerData(
     deletedMessages,
     deletedConversations,
     updatedGroupConversations,
-  };
-}
-
-export async function reconcileMessengerData(
-  client: DataClient,
-  cognitoUsers: CognitoDirectoryUser[],
-): Promise<ReconcileMessengerResult> {
-  let profilesConsolidated = 0;
-  let orphanProfilesRemoved = 0;
-
-  const validSubs = new Set(
-    cognitoUsers.map((user) => user.cognitoSub).filter(Boolean) as string[],
-  );
-  const validHandles = new Set(
-    cognitoUsers.map((user) => user.username.trim().toLowerCase()),
-  );
-
-  for (const user of cognitoUsers) {
-    if (!user.cognitoSub) continue;
-    const before = await listAllProfiles(client);
-    await ensureProfileForCognitoUser(client, {
-      username: user.username,
-      cognitoSub: user.cognitoSub,
-    });
-    await consolidateUserProfiles(client, user.username, user.cognitoSub);
-    const after = await listAllProfiles(client);
-    if (after.length < before.length) {
-      profilesConsolidated += before.length - after.length;
-    }
-  }
-
-  let profiles = await listAllProfiles(client);
-  for (const profile of profiles) {
-    const handle = profile.username.trim().toLowerCase();
-    const staleSub =
-      profile.cognitoSub != null && !validSubs.has(profile.cognitoSub);
-    const orphanStub = validHandles.has(handle) && !profile.cognitoSub;
-    const orphanStale = validHandles.has(handle) && staleSub;
-    const legacyUuidUsername =
-      profile.cognitoSub != null && profile.username === profile.cognitoSub;
-    const duplicateHandle =
-      validHandles.has(handle) &&
-      profile.cognitoSub != null &&
-      !legacyUuidUsername &&
-      profiles.filter(
-        (other) =>
-          other.id !== profile.id &&
-          other.username === profile.username &&
-          other.cognitoSub != null &&
-          validSubs.has(other.cognitoSub),
-      ).length > 0 &&
-      (staleSub || !validSubs.has(profile.cognitoSub));
-
-    if (orphanStub || orphanStale || duplicateHandle || legacyUuidUsername) {
-      await client.models.UserProfile.delete({ id: profile.id }, { authMode: 'iam' });
-      orphanProfilesRemoved++;
-    }
-  }
-
-  profiles = await listAllProfiles(client);
-  const canonicalSubByParticipant = buildCanonicalSubMap(cognitoUsers, profiles);
-
-  let conversations = await listAllConversations(client);
-  let messages = await listAllMessages(client);
-  const messagesByConversation = new Map<string, Schema['Message']['type'][]>();
-  for (const message of messages) {
-    if (!message.conversationId) continue;
-    const bucket = messagesByConversation.get(message.conversationId) ?? [];
-    bucket.push(message);
-    messagesByConversation.set(message.conversationId, bucket);
-  }
-
-  let duplicateConversationsRemoved = 0;
-  let messagesRemoved = 0;
-  const conversationsByPeer = new Map<string, Conversation[]>();
-  for (const conversation of conversations) {
-    const key = directPeerKey(conversation, canonicalSubByParticipant);
-    if (!key) continue;
-    const bucket = conversationsByPeer.get(key) ?? [];
-    bucket.push(conversation);
-    conversationsByPeer.set(key, bucket);
-  }
-
-  for (const peerConversations of conversationsByPeer.values()) {
-    if (peerConversations.length <= 1) continue;
-    peerConversations.sort(
-      (a, b) => conversationActivityAt(b) - conversationActivityAt(a),
-    );
-    const [, ...staleConversations] = peerConversations;
-    for (const conversation of staleConversations) {
-      messagesRemoved += await deleteConversationWithMessages(
-        client,
-        conversation.id,
-        messagesByConversation,
-      );
-      duplicateConversationsRemoved++;
-    }
-  }
-
-  conversations = await listAllConversations(client);
-  let conversationsNormalized = 0;
-  for (const conversation of conversations) {
-    const participants = (conversation.participants ?? []).filter(
-      (participant): participant is string => !!participant,
-    );
-    const normalized = [
-      ...new Set(
-        participants.map((participant) =>
-          resolveCanonicalSub(participant, canonicalSubByParticipant),
-        ),
-      ),
-    ];
-    const changed =
-      normalized.length !== participants.length ||
-      normalized.some((value, index) => value !== participants[index]);
-    if (!changed) continue;
-
-    await client.models.Conversation.update(
-      { id: conversation.id, participants: normalized },
-      { authMode: 'iam' },
-    );
-    conversationsNormalized++;
-
-    const conversationMessages = messagesByConversation.get(conversation.id) ?? [];
-    for (const message of conversationMessages) {
-      const participantUsernames = (message.participantUsernames ?? []).filter(
-        (participant): participant is string => !!participant,
-      );
-      const normalizedParticipants = [
-        ...new Set(
-          participantUsernames.map((participant) =>
-            resolveCanonicalSub(participant, canonicalSubByParticipant),
-          ),
-        ),
-      ];
-      const messageChanged =
-        normalizedParticipants.length !== participantUsernames.length ||
-        normalizedParticipants.some(
-          (value, index) => value !== participantUsernames[index],
-        );
-      if (!messageChanged) continue;
-      await client.models.Message.update(
-        {
-          id: message.id,
-          participantUsernames: normalizedParticipants,
-        },
-        { authMode: 'iam' },
-      );
-    }
-  }
-
-  return {
-    profilesConsolidated,
-    orphanProfilesRemoved,
-    duplicateConversationsRemoved,
-    messagesRemoved,
-    conversationsNormalized,
   };
 }

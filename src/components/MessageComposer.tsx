@@ -169,10 +169,6 @@ export default function MessageComposer({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      void send();
-    }
     if (e.key === 'Escape' && replyTo) {
       e.preventDefault();
       onCancelReply?.();
@@ -245,9 +241,9 @@ export default function MessageComposer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          rows={1}
+          rows={3}
           placeholder={replyTo ? 'Type your reply' : 'Type a message'}
-          className="max-h-32 min-h-10 flex-1 resize-none rounded-2xl bg-[var(--color-panel-2)] px-4 py-2.5 text-[15px] outline-none placeholder:text-[var(--color-muted)]"
+          className="max-h-40 min-h-[4.5rem] flex-1 resize-y rounded-2xl bg-[var(--color-panel-2)] px-4 py-2.5 text-[15px] leading-relaxed outline-none placeholder:text-[var(--color-muted)]"
         />
 
         <button

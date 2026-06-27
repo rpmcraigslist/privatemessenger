@@ -157,14 +157,6 @@ const schema = a
       deletedConversations: a.integer().required(),
     }),
 
-    AdminReconcileMessengerResult: a.customType({
-      profilesConsolidated: a.integer().required(),
-      orphanProfilesRemoved: a.integer().required(),
-      duplicateConversationsRemoved: a.integer().required(),
-      messagesRemoved: a.integer().required(),
-      conversationsNormalized: a.integer().required(),
-    }),
-
     DeleteMyMessageResult: a.customType({
       messageId: a.string().required(),
       deleted: a.boolean().required(),
@@ -294,12 +286,6 @@ const schema = a
         usernameB: a.string().required(),
       })
       .returns(a.ref('AdminPurgeDirectChatResult'))
-      .authorization((allow) => [allow.authenticated()])
-      .handler(a.handler.function(adminOps)),
-
-    adminReconcileMessenger: a
-      .mutation()
-      .returns(a.ref('AdminReconcileMessengerResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

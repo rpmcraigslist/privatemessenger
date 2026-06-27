@@ -29,7 +29,6 @@ export const REQUIRED_GRAPHQL_OPERATIONS = {
     'syncMyProfile',
     'deleteMyMessage',
     'adminDeleteUser',
-    'adminReconcileMessenger',
     'adminPurgeDirectChat',
     'upsertMyReadCursor',
   ] as const,

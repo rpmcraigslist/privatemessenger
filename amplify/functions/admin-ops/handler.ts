@@ -21,7 +21,6 @@ import {
   buildParticipantIdentityForHandle,
   purgeDirectChatBetween,
   purgeUserMessengerData,
-  reconcileMessengerData,
 } from '../shared/messenger-reconcile';
 import {
   deleteAllReadStates,
@@ -382,18 +381,6 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         })),
         usernameA,
         usernameB,
-      );
-    }
-    case 'adminReconcileMessenger': {
-      const client = await dataClientPromise;
-      const users = await listUsers();
-      return reconcileMessengerData(
-        client,
-        users.map((user) => ({
-          loginId: user.loginId,
-          username: user.username,
-          cognitoSub: user.cognitoSub,
-        })),
       );
     }
     case 'adminCreateUser': {

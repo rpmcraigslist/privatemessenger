@@ -41,6 +41,7 @@ import {
 import Avatar from './Avatar';
 
 import ChatGroupPanel from './ChatGroupPanel';
+import BusyOverlay from './BusyOverlay';
 
 import MessageComposer from './MessageComposer';
 
@@ -1297,6 +1298,8 @@ export default function ChatView({
       </section>
 
 
+
+      {deleteBusyId && <BusyOverlay label="Deleting message…" />}
 
       {copyFeedback && (
         <div className="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg">

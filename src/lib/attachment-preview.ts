@@ -8,9 +8,22 @@ const IMAGE_EXTENSIONS = new Set([
   'webp',
   'bmp',
   'avif',
+  'heic',
+  'heif',
+  'tif',
+  'tiff',
 ]);
 
-const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
+const VIDEO_EXTENSIONS = new Set([
+  'mp4',
+  'webm',
+  'mov',
+  'm4v',
+  'ogv',
+  'avi',
+  'mkv',
+  '3gp',
+]);
 
 /** Best-effort media kind for local preview (mime type, then file extension). */
 export function guessAttachmentPreviewKind(file: File): AttachmentPreviewKind {
@@ -24,6 +37,7 @@ export function guessAttachmentPreviewKind(file: File): AttachmentPreviewKind {
 }
 
 const VIDEO_PREVIEW_MAX_EDGE_PX = 720;
+const VIDEO_PREVIEW_TIMEOUT_MS = 12_000;
 
 /** Capture a JPEG data URL from the first frame of a local video file. */
 export function captureVideoPreviewDataUrl(file: File): Promise<string> {
@@ -34,15 +48,40 @@ export function captureVideoPreviewDataUrl(file: File): Promise<string> {
     video.muted = true;
     video.playsInline = true;
 
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      fail(new Error('Video preview timed out'));
+    }, VIDEO_PREVIEW_TIMEOUT_MS);
+
     const cleanup = () => {
+      window.clearTimeout(timeoutId);
       URL.revokeObjectURL(objectUrl);
       video.removeAttribute('src');
       video.load();
     };
 
     const fail = (reason?: unknown) => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(reason ?? new Error('Could not preview video'));
+    };
+
+    const succeed = (dataUrl: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(dataUrl);
+    };
+
+    const seekToPreviewFrame = () => {
+      const duration = video.duration;
+      video.currentTime =
+        Number.isFinite(duration) && duration > 0
+          ? Math.min(0.1, duration * 0.01)
+          : 0;
     };
 
     video.addEventListener('error', () => fail(), { once: true });
@@ -50,11 +89,13 @@ export function captureVideoPreviewDataUrl(file: File): Promise<string> {
     video.addEventListener(
       'loadeddata',
       () => {
-        const seekTime = Math.min(
-          0.1,
-          Math.max(0, (video.duration || 0) * 0.01),
-        );
-        video.currentTime = seekTime;
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          seekToPreviewFrame();
+          return;
+        }
+        video.addEventListener('loadedmetadata', seekToPreviewFrame, {
+          once: true,
+        });
       },
       { once: true },
     );
@@ -84,9 +125,7 @@ export function captureVideoPreviewDataUrl(file: File): Promise<string> {
           }
 
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          cleanup();
-          resolve(dataUrl);
+          succeed(canvas.toDataURL('image/jpeg', 0.85));
         } catch (err) {
           fail(err);
         }

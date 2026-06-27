@@ -24,6 +24,13 @@ import {
   reconcileMessengerData,
 } from '../shared/messenger-reconcile';
 import {
+  deleteAllReadStates,
+  deleteConversationStoragePrefix,
+  deleteMessageRecord,
+  deleteMessageStorage,
+  deleteProfilesForIdentity,
+} from '../shared/messenger-cleanup';
+import {
   fromLoginId,
   isAdminGroupMember,
   isCognitoUuid,
@@ -335,6 +342,7 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       throw new Error('You can only delete your own messages');
     }
 
+    await deleteMessageStorage(message);
     await client.models.Message.delete({ id: messageId }, { authMode: 'iam' });
     return { messageId, deleted: true };
   }
@@ -458,19 +466,21 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       );
       const { deletedMessages, deletedConversations } =
         await purgeUserMessengerData(client, identity);
-      await cognito.send(
-        new AdminDeleteUserCommand({
-          UserPoolId: poolId(),
-          Username: toLoginId(handle),
-        }),
-      );
-      const profiles = await client.models.UserProfile.list({
-        filter: { username: { eq: handle } },
-        authMode: 'iam',
-      });
-      for (const p of profiles.data) {
-        await client.models.UserProfile.delete({ id: p.id }, { authMode: 'iam' });
+      await deleteProfilesForIdentity(client, identity);
+      try {
+        await cognito.send(
+          new AdminDeleteUserCommand({
+            UserPoolId: poolId(),
+            Username: toLoginId(handle),
+          }),
+        );
+      } catch (err) {
+        const name = err instanceof Error ? err.name : '';
+        if (name !== 'UserNotFoundException') {
+          throw err;
+        }
       }
+      await deleteProfilesForIdentity(client, identity);
       return { username: handle, deletedMessages, deletedConversations };
     }
     case 'adminForcePasswordChange': {
@@ -517,12 +527,20 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
           u.username,
         );
         await purgeUserMessengerData(client, identity);
-        await cognito.send(
-          new AdminDeleteUserCommand({
-            UserPoolId: poolId(),
-            Username: u.loginId,
-          }),
-        );
+        await deleteProfilesForIdentity(client, identity);
+        try {
+          await cognito.send(
+            new AdminDeleteUserCommand({
+              UserPoolId: poolId(),
+              Username: u.loginId,
+            }),
+          );
+        } catch (err) {
+          const name = err instanceof Error ? err.name : '';
+          if (name !== 'UserNotFoundException') {
+            throw err;
+          }
+        }
         deleted++;
       }
       const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
@@ -538,16 +556,18 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       let deletedConversations = 0;
       const messages = await client.models.Message.list({ authMode: 'iam' });
       for (const m of messages.data) {
-        await client.models.Message.delete({ id: m.id }, { authMode: 'iam' });
+        await deleteMessageRecord(client, m);
         deletedMessages++;
       }
       const conversations = await client.models.Conversation.list({
         authMode: 'iam',
       });
       for (const c of conversations.data) {
+        await deleteConversationStoragePrefix(c.id);
         await client.models.Conversation.delete({ id: c.id }, { authMode: 'iam' });
         deletedConversations++;
       }
+      await deleteAllReadStates(client);
       return { deletedMessages, deletedConversations };
     }
     default:

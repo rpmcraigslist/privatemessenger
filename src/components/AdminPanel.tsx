@@ -7,6 +7,7 @@ import {
   normalizeUsername,
   usernameError,
 } from '../lib/util';
+import BusyOverlay from './BusyOverlay';
 import { NoSaveField, NoSaveForm } from './NoSaveCredentials';
 
 type AdminUser = {
@@ -48,6 +49,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState('Working…');
 
   const [newUsername, setNewUsername] = useState('');
   const [tempPassword, setTempPassword] = useState('');
@@ -89,6 +91,19 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     void loadAudit();
   }, [loadAudit]);
 
+  async function runBusy<T>(
+    label: string,
+    action: () => Promise<T>,
+  ): Promise<T | undefined> {
+    setBusyLabel(label);
+    setBusy(true);
+    try {
+      return await action();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function createUser(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -111,32 +126,31 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     }
     const email = normalizeContactEmail(newEmail);
 
-    setBusy(true);
-    try {
-      const { data, errors } = await client.mutations.adminCreateUser({
-        username: handle,
-        temporaryPassword: tempPassword,
-        contactEmail: email ?? undefined,
-        forcePasswordChange: forceChange,
-      });
-      if (errors?.length) throw new Error(errors[0].message);
-      if (!data?.username) {
-        throw new Error('Create failed — no response from server.');
+    await runBusy('Creating user…', async () => {
+      try {
+        const { data, errors } = await client.mutations.adminCreateUser({
+          username: handle,
+          temporaryPassword: tempPassword,
+          contactEmail: email ?? undefined,
+          forcePasswordChange: forceChange,
+        });
+        if (errors?.length) throw new Error(errors[0].message);
+        if (!data?.username) {
+          throw new Error('Create failed — no response from server.');
+        }
+        setMessage(
+          `Created ${data.username}. They must sign in and ${forceChange ? 'set a new password' : 'use the assigned password'}.`,
+        );
+        setNewUsername('');
+        setTempPassword('');
+        setNewEmail('');
+        await loadUsers();
+        await loadAudit();
+      } catch (err) {
+        console.error('adminCreateUser failed', err);
+        setError(err instanceof Error ? err.message : 'Create failed');
       }
-      setMessage(
-        `Created ${data.username}. They must sign in and ${forceChange ? 'set a new password' : 'use the assigned password'}.`,
-      );
-      setNewUsername('');
-      setTempPassword('');
-      setNewEmail('');
-      await loadUsers();
-      await loadAudit();
-    } catch (err) {
-      console.error('adminCreateUser failed', err);
-      setError(err instanceof Error ? err.message : 'Create failed');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function forcePasswordChange(username: string) {
@@ -144,6 +158,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       `Temporary password for "${username}"\n\nThey must change it on next sign-in.`,
     );
     if (!temp?.trim()) return;
+    setBusyLabel('Resetting password…');
     setBusy(true);
     setError(null);
     try {
@@ -169,6 +184,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     ) {
       return;
     }
+    setBusyLabel(`Removing ${username}…`);
     setBusy(true);
     setError(null);
     try {
@@ -177,7 +193,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       const deletedMessages = data?.deletedMessages ?? 0;
       const deletedConversations = data?.deletedConversations ?? 0;
       setMessage(
-        `Removed ${username}. Deleted ${deletedMessages} message(s) and ${deletedConversations} conversation(s).`,
+        `Removed ${username}. Deleted ${deletedMessages} message(s), ${deletedConversations} conversation(s), and all related profile data.`,
       );
       await loadUsers();
       await loadAudit();
@@ -197,10 +213,8 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     ) {
       return;
     }
+    setBusyLabel('Removing users…');
     setBusy(true);
-    setError(null);
-    try {
-      const { data, errors } = await client.mutations.adminPurgeUsers();
       if (errors?.length) throw new Error(errors[0].message);
       setMessage(`Removed ${data?.deleted ?? 0} user(s).`);
       await loadUsers();
@@ -214,6 +228,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
 
   async function clearMessages() {
     if (!confirm('Delete every message in the system?')) return;
+    setBusyLabel('Clearing all messages…');
     setBusy(true);
     setError(null);
     try {
@@ -247,11 +262,8 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       return;
     }
 
+    setBusyLabel('Purging direct chat…');
     setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const { data, errors } = await client.mutations.adminPurgeDirectChat({
         usernameA,
         usernameB,
       });
@@ -276,11 +288,8 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       return;
     }
 
+    setBusyLabel('Reconciling profiles and chats…');
     setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const { data, errors } = await client.mutations.adminReconcileMessenger();
       if (errors?.length) throw new Error(errors[0].message);
       setMessage(
         [
@@ -301,10 +310,12 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
-      onClick={onClose}
-    >
+    <>
+      {busy && <BusyOverlay label={busyLabel} />}
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+        onClick={onClose}
+      >
       <div
         className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-2xl bg-[var(--color-panel)] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -536,5 +547,6 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
         </div>
       </div>
     </div>
+    </>
   );
 }

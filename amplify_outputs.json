@@ -724,6 +724,23 @@
           },
           "isRequired": false,
           "isArrayNullable": true
+        },
+        "listUserDirectory": {
+          "name": "listUserDirectory",
+          "isArray": true,
+          "type": {
+            "nonModel": "DirectoryUser"
+          },
+          "isRequired": false,
+          "isArrayNullable": true
+        },
+        "adminAuditMessenger": {
+          "name": "adminAuditMessenger",
+          "isArray": false,
+          "type": {
+            "nonModel": "AdminAuditMessengerResult"
+          },
+          "isRequired": false
         }
       },
       "mutations": {

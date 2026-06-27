@@ -4,5 +4,5 @@ export const adminOps = defineFunction({
   name: 'admin-ops',
   resourceGroupName: 'data',
   entry: './handler.ts',
-  timeoutSeconds: 30,
+  timeoutSeconds: 120,
 });

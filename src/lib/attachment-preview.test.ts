@@ -26,6 +26,9 @@ describe('guessAttachmentPreviewKind', () => {
       guessAttachmentPreviewKind(new File(['x'], 'clip.MOV')),
     ).toBe('video');
     expect(
+      guessAttachmentPreviewKind(new File(['x'], 'photo.HEIC')),
+    ).toBe('image');
+    expect(
       guessAttachmentPreviewKind(new File(['x'], 'notes.pdf')),
     ).toBe('none');
   });

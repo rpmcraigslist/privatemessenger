@@ -16,6 +16,25 @@ export const SYNC_PROFILE_CONTRACT = {
   ] as const,
 } as const;
 
+/** GraphQL operations the client calls — must exist in amplify_outputs.json. */
+export const REQUIRED_GRAPHQL_OPERATIONS = {
+  queries: [
+    'listUserDirectory',
+    'adminListUsers',
+    'adminAuditMessenger',
+    'listMyReadCursors',
+    'getAttachmentUrl',
+  ] as const,
+  mutations: [
+    'syncMyProfile',
+    'deleteMyMessage',
+    'adminDeleteUser',
+    'adminReconcileMessenger',
+    'adminPurgeDirectChat',
+    'upsertMyReadCursor',
+  ] as const,
+} as const;
+
 export type SyncProfileMutationArg =
   (typeof SYNC_PROFILE_CONTRACT.mutationArgs)[number];
 
@@ -35,6 +54,7 @@ type OutputsIntrospection = {
   data?: {
     model_introspection?: {
       models?: Record<string, { fields?: Record<string, unknown> }>;
+      queries?: Record<string, unknown>;
       mutations?: Record<string, { arguments?: Record<string, unknown> }>;
       nonModels?: Record<string, { fields?: Record<string, unknown> }>;
     };
@@ -93,6 +113,20 @@ export function assertAmplifyOutputsMatchContract(
     issues.push(
       'UserProfile is missing messageBubbleColor in amplify_outputs.json',
     );
+  }
+
+  const queries = introspection.queries ?? {};
+  for (const name of REQUIRED_GRAPHQL_OPERATIONS.queries) {
+    if (!queries[name]) {
+      issues.push(`amplify_outputs.json is missing query "${name}"`);
+    }
+  }
+
+  const mutations = introspection.mutations ?? {};
+  for (const name of REQUIRED_GRAPHQL_OPERATIONS.mutations) {
+    if (!mutations[name]) {
+      issues.push(`amplify_outputs.json is missing mutation "${name}"`);
+    }
   }
 
   return issues;

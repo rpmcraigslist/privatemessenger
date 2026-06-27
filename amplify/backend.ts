@@ -64,7 +64,16 @@ backend.storage.resources.bucket.grantRead(
   backend.attachmentUrl.resources.lambda,
 );
 
+backend.storage.resources.bucket.grantReadWrite(
+  backend.adminOps.resources.lambda,
+);
+
 backend.attachmentUrl.addEnvironment(
+  'STORAGE_BUCKET_NAME',
+  backend.storage.resources.bucket.bucketName,
+);
+
+backend.adminOps.addEnvironment(
   'STORAGE_BUCKET_NAME',
   backend.storage.resources.bucket.bucketName,
 );

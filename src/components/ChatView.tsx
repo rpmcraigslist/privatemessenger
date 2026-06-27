@@ -167,6 +167,8 @@ export default function ChatView({
 
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
 
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -452,6 +454,24 @@ export default function ChatView({
     [onMessageDeleted],
 
   );
+
+
+
+  const handleCopyMessage = useCallback(async (message: MessageModel) => {
+    const text = message.content?.trim();
+    if (!text) return;
+
+    setMessageMenu(null);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback('Copied');
+      window.setTimeout(() => setCopyFeedback(null), 1800);
+    } catch (err) {
+      console.error('copy message failed', err);
+      setCopyFeedback('Copy failed');
+      window.setTimeout(() => setCopyFeedback(null), 1800);
+    }
+  }, []);
 
 
 
@@ -1262,6 +1282,8 @@ export default function ChatView({
 
         subToUsername={subToUsername}
 
+        directoryLoading={directoryLoading}
+
         replyTo={replyTo}
 
         onCancelReply={() => setReplyTo(null)}
@@ -1276,6 +1298,12 @@ export default function ChatView({
 
 
 
+      {copyFeedback && (
+        <div className="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
+          {copyFeedback}
+        </div>
+      )}
+
       {messageMenu && (
 
         <MessageActionMenu
@@ -1289,6 +1317,8 @@ export default function ChatView({
             setMessageMenu(null);
 
           }}
+
+          onCopy={() => void handleCopyMessage(messageMenu.message)}
 
           onDelete={() => void handleDeleteMessage(messageMenu.message)}
 
@@ -1380,6 +1410,8 @@ function MessageActionMenu({
 
   onReply,
 
+  onCopy,
+
   onDelete,
 
 }: {
@@ -1387,6 +1419,8 @@ function MessageActionMenu({
   menu: MessageMenuState;
 
   onReply: () => void;
+
+  onCopy: () => void;
 
   onDelete: () => void;
 
@@ -1451,6 +1485,24 @@ function MessageActionMenu({
         Reply
 
       </button>
+
+      {menu.message.content?.trim() && (
+
+        <button
+
+          type="button"
+
+          onClick={onCopy}
+
+          className="flex w-full px-4 py-2.5 text-left text-sm hover:bg-white/10"
+
+        >
+
+          Copy
+
+        </button>
+
+      )}
 
       {menu.mine && (
 

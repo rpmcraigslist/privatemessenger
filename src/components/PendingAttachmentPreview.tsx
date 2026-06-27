@@ -15,11 +15,13 @@ export default function PendingAttachmentPreview({ file, onRemove }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewKind, setPreviewKind] = useState<AttachmentPreviewKind>('none');
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
 
   useEffect(() => {
     const kind = guessAttachmentPreviewKind(file);
     setPreviewKind(kind);
     setPreviewUrl(null);
+    setPreviewUnavailable(false);
     setLoadingPreview(kind !== 'none');
 
     if (kind === 'none') return;
@@ -39,6 +41,7 @@ export default function PendingAttachmentPreview({ file, onRemove }: Props) {
         if (!cancelled) setPreviewUrl(poster);
       } catch (err) {
         console.warn('attachment preview failed', err);
+        if (!cancelled) setPreviewUnavailable(true);
       } finally {
         if (!cancelled) setLoadingPreview(false);
       }
@@ -51,7 +54,8 @@ export default function PendingAttachmentPreview({ file, onRemove }: Props) {
   }, [file]);
 
   const showVisualPreview =
-    previewKind !== 'none' && (loadingPreview || previewUrl != null);
+    previewKind !== 'none' &&
+    (loadingPreview || previewUrl != null || previewUnavailable);
 
   return (
     <div className="mb-2 overflow-hidden rounded-lg bg-[var(--color-panel-2)]">
@@ -64,12 +68,21 @@ export default function PendingAttachmentPreview({ file, onRemove }: Props) {
             >
               Loading preview…
             </div>
+          ) : previewUnavailable ? (
+            <div className="flex h-32 items-center justify-center px-4 text-center text-sm text-[var(--color-muted)]">
+              Preview unavailable for this {previewKind === 'video' ? 'video' : 'image'}{' '}
+              format — you can still send it.
+            </div>
           ) : previewUrl ? (
             <>
               <img
                 src={previewUrl}
                 alt={`Preview of ${file.name}`}
                 className="max-h-52 w-full object-contain"
+                onError={() => {
+                  setPreviewUrl(null);
+                  setPreviewUnavailable(true);
+                }}
               />
               {previewKind === 'video' && (
                 <span

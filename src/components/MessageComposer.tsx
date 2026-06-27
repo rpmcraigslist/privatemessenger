@@ -10,6 +10,7 @@ import {
   type ReplyTarget,
 } from '../lib/util';
 import PendingAttachmentPreview from './PendingAttachmentPreview';
+import BusyOverlay from './BusyOverlay';
 
 type Props = {
   conversation: ConversationModel;
@@ -17,6 +18,7 @@ type Props = {
   mySub: string;
   handleToSub: Map<string, string>;
   subToUsername: Map<string, string>;
+  directoryLoading?: boolean;
   replyTo?: ReplyTarget | null;
   onCancelReply?: () => void;
   onSent?: () => void;
@@ -31,6 +33,7 @@ export default function MessageComposer({
   mySub,
   handleToSub,
   subToUsername,
+  directoryLoading = false,
   replyTo,
   onCancelReply,
   onSent,
@@ -46,8 +49,14 @@ export default function MessageComposer({
 
   function pickFile(selected: File | null) {
     setError(null);
-    if (selected && selected.size > MAX_FILE_BYTES) {
+    if (!selected) {
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    if (selected.size > MAX_FILE_BYTES) {
       setError(`File too large (max ${formatBytes(MAX_FILE_BYTES)}).`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
     setFile(selected);
@@ -172,6 +181,9 @@ export default function MessageComposer({
 
   return (
     <div className="bg-[var(--color-panel)] px-3 py-2.5">
+      {sending && (
+        <BusyOverlay label={file ? 'Uploading and sending…' : 'Sending…'} />
+      )}
       {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
 
       {replyTo && (
@@ -179,7 +191,9 @@ export default function MessageComposer({
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-[var(--color-accent)]">
               Replying to{' '}
-              {participantDisplayName(replyTo.senderUsername, subToUsername)}
+              {participantDisplayName(replyTo.senderUsername, subToUsername, {
+                directoryLoading,
+              })}
             </p>
             <p className="truncate text-sm text-[var(--color-muted)]">
               {replyTo.contentPreview}

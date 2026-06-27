@@ -2,6 +2,11 @@ import type { Schema } from '../../data/resource';
 import type { generateClient } from 'aws-amplify/data';
 import { fromLoginId, toLoginId } from './cognito';
 import {
+  deleteConversationStoragePrefix,
+  deleteMessageRecord,
+  deleteReadStatesForIdentity,
+} from './messenger-cleanup';
+import {
   consolidateUserProfiles,
   ensureProfileForCognitoUser,
   isValidMessengerHandle,
@@ -177,9 +182,10 @@ async function deleteConversationWithMessages(
 ): Promise<number> {
   const messages = messagesByConversation.get(conversationId) ?? [];
   for (const message of messages) {
-    await client.models.Message.delete({ id: message.id }, { authMode: 'iam' });
+    await deleteMessageRecord(client, message);
   }
   messagesByConversation.delete(conversationId);
+  await deleteConversationStoragePrefix(conversationId);
   await client.models.Conversation.delete({ id: conversationId }, { authMode: 'iam' });
   return messages.length;
 }
@@ -433,7 +439,7 @@ export async function purgeUserMessengerData(
 
     for (const message of convMessages) {
       if (isMessageSentByIdentity(message, identity)) {
-        await client.models.Message.delete({ id: message.id }, { authMode: 'iam' });
+        await deleteMessageRecord(client, message);
         deletedMessages++;
         continue;
       }
@@ -490,23 +496,11 @@ export async function purgeUserMessengerData(
   ];
   for (const message of orphanMessages) {
     if (!isMessageAssociatedWithIdentity(message, identity)) continue;
-    await client.models.Message.delete({ id: message.id }, { authMode: 'iam' });
+    await deleteMessageRecord(client, message);
     deletedMessages++;
   }
 
-  if (identity.sub) {
-    const readStates = await client.models.ConversationReadState.list({
-      filter: { userSub: { eq: identity.sub } },
-      authMode: 'iam',
-    });
-    for (const row of readStates.data ?? []) {
-      if (!row.userSub || !row.readScopeKey) continue;
-      await client.models.ConversationReadState.delete(
-        { userSub: row.userSub, readScopeKey: row.readScopeKey },
-        { authMode: 'iam' },
-      );
-    }
-  }
+  await deleteReadStatesForIdentity(client, identity);
 
   return {
     deletedMessages,

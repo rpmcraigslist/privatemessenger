@@ -838,15 +838,35 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-  const handleMessageDeleted = useCallback((messageId: string) => {
+  const handleMessageDeleted = useCallback(
+    (result: {
+      messageId: string;
+      conversationId?: string | null;
+      conversationDeleted?: boolean;
+    }) => {
+      alertStateRef.current.alertedMessageIds.delete(result.messageId);
+      pendingOptimisticMessagesRef.current.delete(result.messageId);
+      setAllMessages((prev) => removeMessageById(prev, result.messageId));
 
-    alertStateRef.current.alertedMessageIds.delete(messageId);
+      if (!result.conversationDeleted || !result.conversationId) return;
 
-    pendingOptimisticMessagesRef.current.delete(messageId);
-
-    setAllMessages((prev) => removeMessageById(prev, messageId));
-
-  }, []);
+      const conversationId = result.conversationId;
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      setAllMessages((prev) =>
+        prev.filter((message) => message.conversationId !== conversationId),
+      );
+      setLatestByConversation((prev) => {
+        const next = new Map(prev);
+        next.delete(conversationId);
+        return next;
+      });
+      if (selectedIdRef.current === conversationId) {
+        setSelectedId(null);
+      }
+      setReadRevision((revision) => revision + 1);
+    },
+    [],
+  );
 
 
 

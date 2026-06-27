@@ -83,7 +83,11 @@ type Props = {
 
   onMessageCreated?: (message: MessageModel) => void;
 
-  onMessageDeleted?: (messageId: string) => void;
+  onMessageDeleted?: (result: {
+    messageId: string;
+    conversationId?: string | null;
+    conversationDeleted?: boolean;
+  }) => void;
 
   /** Scroll to this message once when opening from an email/deep link. */
   focusMessageId?: string | null;
@@ -432,7 +436,11 @@ export default function ChatView({
 
         if (!data?.deleted) throw new Error('Delete failed');
 
-        onMessageDeleted?.(message.id);
+        onMessageDeleted?.({
+          messageId: message.id,
+          conversationId: data.conversationId ?? message.conversationId,
+          conversationDeleted: data.conversationDeleted ?? false,
+        });
 
       } catch (err) {
 

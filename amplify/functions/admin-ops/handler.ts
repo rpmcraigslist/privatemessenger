@@ -25,8 +25,8 @@ import {
 import {
   deleteAllReadStates,
   deleteConversationStoragePrefix,
+  deleteMessageAndMaintainConversation,
   deleteMessageRecord,
-  deleteMessageStorage,
   deleteProfilesForIdentity,
 } from '../shared/messenger-cleanup';
 import {
@@ -341,9 +341,13 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       throw new Error('You can only delete your own messages');
     }
 
-    await deleteMessageStorage(message);
-    await client.models.Message.delete({ id: messageId }, { authMode: 'iam' });
-    return { messageId, deleted: true };
+    const cleanup = await deleteMessageAndMaintainConversation(client, message);
+    return {
+      messageId,
+      deleted: true,
+      conversationId: cleanup.conversationId,
+      conversationDeleted: cleanup.conversationDeleted,
+    };
   }
 
   const actor = await assertAdmin(event.identity);

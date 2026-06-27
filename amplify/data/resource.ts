@@ -160,6 +160,8 @@ const schema = a
     DeleteMyMessageResult: a.customType({
       messageId: a.string().required(),
       deleted: a.boolean().required(),
+      conversationId: a.string(),
+      conversationDeleted: a.boolean().required(),
     }),
 
     MessageAlertsResult: a.customType({

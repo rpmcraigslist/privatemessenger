@@ -81,6 +81,113 @@ export async function deleteMessageStorage(
   await deleteStorageObject(message.attachmentKey);
 }
 
+function messageListPreview(message: {
+  content?: string | null;
+  type?: string | null;
+  attachmentName?: string | null;
+}): string {
+  const body = message.content?.trim();
+  if (body) return body.slice(0, 120);
+  if (message.type === 'image') return '📷 Photo';
+  if (message.attachmentName) return `📎 ${message.attachmentName}`.slice(0, 120);
+  return '📎 Attachment';
+}
+
+async function listMessagesForConversation(
+  client: DataClient,
+  conversationId: string,
+): Promise<Schema['Message']['type'][]> {
+  const result = await client.models.Message.list({
+    filter: { conversationId: { eq: conversationId } },
+    authMode: 'iam',
+  });
+  return result.data ?? [];
+}
+
+function latestMessage(
+  messages: Schema['Message']['type'][],
+): Schema['Message']['type'] | null {
+  let latest: Schema['Message']['type'] | null = null;
+  let latestMs = -1;
+  for (const message of messages) {
+    const createdAt = message.createdAt;
+    if (!createdAt) continue;
+    const ms = new Date(createdAt).getTime();
+    if (Number.isNaN(ms) || ms < latestMs) continue;
+    latestMs = ms;
+    latest = message;
+  }
+  return latest;
+}
+
+export async function deleteReadStatesForConversation(
+  client: DataClient,
+  conversationId: string,
+): Promise<number> {
+  const rows = await client.models.ConversationReadState.list({ authMode: 'iam' });
+  let deleted = 0;
+  const scopeKeys = new Set([conversationId, `conv:${conversationId}`]);
+
+  for (const row of rows.data ?? []) {
+    if (!row.userSub || !row.readScopeKey) continue;
+    if (
+      row.conversationId === conversationId ||
+      scopeKeys.has(row.readScopeKey)
+    ) {
+      await client.models.ConversationReadState.delete(
+        { userSub: row.userSub, readScopeKey: row.readScopeKey },
+        { authMode: 'iam' },
+      );
+      deleted++;
+    }
+  }
+
+  return deleted;
+}
+
+export type DeleteMessageCleanupResult = {
+  conversationId: string | null;
+  conversationDeleted: boolean;
+};
+
+/** Delete one message and drop or refresh its conversation when needed. */
+export async function deleteMessageAndMaintainConversation(
+  client: DataClient,
+  message: Schema['Message']['type'],
+): Promise<DeleteMessageCleanupResult> {
+  const conversationId = message.conversationId ?? null;
+  await deleteMessageRecord(client, message);
+
+  if (!conversationId) {
+    return { conversationId: null, conversationDeleted: false };
+  }
+
+  const remaining = await listMessagesForConversation(client, conversationId);
+  if (remaining.length === 0) {
+    await deleteConversationStoragePrefix(conversationId);
+    await deleteReadStatesForConversation(client, conversationId);
+    await client.models.Conversation.delete(
+      { id: conversationId },
+      { authMode: 'iam' },
+    );
+    return { conversationId, conversationDeleted: true };
+  }
+
+  const newest = latestMessage(remaining);
+  if (newest) {
+    await client.models.Conversation.update(
+      {
+        id: conversationId,
+        lastMessage: messageListPreview(newest),
+        lastMessageAt: newest.createdAt ?? new Date().toISOString(),
+      },
+      { authMode: 'iam' },
+    );
+  }
+
+  return { conversationId, conversationDeleted: false };
+}
+
 export async function deleteAllReadStates(client: DataClient): Promise<number> {
   const rows = await client.models.ConversationReadState.list({
     authMode: 'iam',

@@ -584,6 +584,20 @@
               "type": "Boolean",
               "isRequired": true,
               "attributes": []
+            },
+            "conversationId": {
+              "name": "conversationId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "conversationDeleted": {
+              "name": "conversationDeleted",
+              "isArray": false,
+              "type": "Boolean",
+              "isRequired": true,
+              "attributes": []
             }
           }
         },

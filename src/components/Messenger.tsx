@@ -20,7 +20,10 @@ import { resolveCurrentUser, type SessionUser } from '../lib/session';
 
 import { loadServerReadState, installReadStateFlushHooks, onReadStateLoaded } from '../lib/read-state-sync';
 
-import { consumePendingDeepLink } from '../lib/deep-link';
+import {
+  consumePendingDeepLink,
+  DEEP_LINK_CONVERSATION_NOT_FOUND,
+} from '../lib/deep-link';
 
 import { computeUnreadCounts, totalUnreadCount } from '../lib/unread-counts';
 
@@ -1199,9 +1202,26 @@ export default function Messenger({ onSignOut }: Props) {
           />
 
         ) : (
-
-          <EmptyState />
-
+          <EmptyState
+            title={
+              selectedId && !loading
+                ? 'Conversation not found'
+                : undefined
+            }
+            message={
+              selectedId && !loading
+                ? DEEP_LINK_CONVERSATION_NOT_FOUND
+                : undefined
+            }
+            onDismiss={
+              selectedId && !loading
+                ? () => {
+                    setSelectedId(null);
+                    setFocusMessageId(null);
+                  }
+                : undefined
+            }
+          />
         )}
 
       </main>
@@ -1302,46 +1322,50 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
-function EmptyState() {
-
+function EmptyState({
+  title,
+  message,
+  onDismiss,
+}: {
+  title?: string;
+  message?: string;
+  onDismiss?: () => void;
+}) {
   return (
-
     <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
-
       <div
-
         className="flex h-20 w-20 items-center justify-center rounded-full"
-
         style={{ background: 'var(--color-panel-2)' }}
-
       >
-
         <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden>
-
           <path
-
             d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9l-4 4v-4H5.5C4.67 16 4 15.33 4 14.5v-9Z"
-
             fill="var(--color-accent)"
-
           />
-
         </svg>
-
       </div>
-
-      <h2 className="text-xl font-medium">Private Messenger</h2>
-
-      <p className="max-w-sm text-sm text-[var(--color-muted)]">
-
-        Select a conversation or start a new one.
-
+      <h2 className="text-xl font-medium">
+        {title ?? 'Private Messenger'}
+      </h2>
+      <p
+        className={`max-w-sm text-sm ${
+          message ? 'text-red-400' : 'text-[var(--color-muted)]'
+        }`}
+      >
+        {message ?? 'Select a conversation or start a new one.'}
       </p>
-
+      {onDismiss ? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="mt-2 rounded-full px-4 py-2 text-sm font-medium text-white"
+          style={{ background: 'var(--color-accent)' }}
+        >
+          Back to conversations
+        </button>
+      ) : null}
     </div>
-
   );
-
 }
 
 

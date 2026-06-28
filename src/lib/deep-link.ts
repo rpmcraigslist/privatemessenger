@@ -1,5 +1,11 @@
 const PENDING_DEEP_LINK_KEY = 'messenger:pendingDeepLink';
 
+export const DEEP_LINK_MESSAGE_NOT_FOUND =
+  'This message no longer exists. It may have been deleted.';
+
+export const DEEP_LINK_CONVERSATION_NOT_FOUND =
+  'This conversation no longer exists. It may have been deleted.';
+
 export type MessengerDeepLink = {
   conversationId: string;
   messageId?: string;
@@ -62,4 +68,14 @@ export function consumePendingDeepLink(): MessengerDeepLink | null {
 
 export function clearPendingDeepLink(): void {
   sessionStorage.removeItem(PENDING_DEEP_LINK_KEY);
+}
+
+/** True once messages are loaded and the deep-link target id is absent. */
+export function isDeepLinkMessageMissing(
+  focusMessageId: string | null | undefined,
+  messagesSynced: boolean,
+  messageIds: readonly string[],
+): boolean {
+  if (!focusMessageId || !messagesSynced) return false;
+  return !messageIds.includes(focusMessageId);
 }

@@ -38,6 +38,8 @@ import {
   resolveSenderBubbleColor,
 } from '../lib/message-bubble-colors';
 
+import { DEEP_LINK_MESSAGE_NOT_FOUND, isDeepLinkMessageMissing } from '../lib/deep-link';
+
 import Avatar from './Avatar';
 
 import ChatGroupPanel from './ChatGroupPanel';
@@ -337,6 +339,8 @@ export default function ChatView({
 
     setMessageMenu(null);
 
+    setActionError(null);
+
   }, [conversation.id]);
 
 
@@ -624,7 +628,30 @@ export default function ChatView({
 
   const scrollToEntryPosition = useCallback(() => {
 
-    if (entryScrollDoneRef.current || messages.length === 0 || !messagesSynced) return;
+    if (entryScrollDoneRef.current || !messagesSynced) return;
+
+    if (
+      isDeepLinkMessageMissing(
+        focusMessageId,
+        messagesSynced,
+        messages.map((message) => message.id),
+      )
+    ) {
+      setActionError(DEEP_LINK_MESSAGE_NOT_FOUND);
+      entryScrollDoneRef.current = true;
+      onFocusMessageHandled?.();
+      if (messages.length > 0) {
+        stickToBottomRef.current = true;
+        pinToBottom(true);
+        markVisibleMessagesRead(messages);
+      }
+      return;
+    }
+
+    if (messages.length === 0) {
+      entryScrollDoneRef.current = true;
+      return;
+    }
 
     let positioned = false;
 

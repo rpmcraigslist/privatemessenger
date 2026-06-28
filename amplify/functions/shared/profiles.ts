@@ -1,6 +1,7 @@
 import type { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../data/resource';
 import { fromLoginId, isCognitoUuid, resolveUsernameFromPool } from './cognito';
+import { listProfilesForUser, pickProfileKeeper } from './profile-consolidation';
 
 type DataClient = ReturnType<typeof generateClient<Schema>>;
 type UserProfile = Schema['UserProfile']['type'];
@@ -12,6 +13,48 @@ function participantHandle(participantId: string): string {
   return value;
 }
 
+/** Prefer a profile row that actually has a contact email (duplicate-row safe). */
+export function pickProfileForEmailAlerts(
+  profiles: UserProfile[],
+  username: string | null,
+  sub: string | null,
+): UserProfile | null {
+  if (profiles.length === 0) return null;
+
+  const withEmail = profiles.filter((profile) => profileEmailTarget(profile));
+  if (withEmail.length > 0) {
+    if (username) {
+      return pickProfileKeeper(withEmail, username, sub);
+    }
+    return withEmail[0];
+  }
+
+  if (username) {
+    return pickProfileKeeper(profiles, username, sub);
+  }
+
+  return profiles[0];
+}
+
+async function profilesForSub(
+  client: DataClient,
+  sub: string,
+): Promise<UserProfile[]> {
+  const bySub = await client.models.UserProfile.list({
+    filter: { cognitoSub: { eq: sub } },
+    authMode: 'iam',
+  });
+  const byLegacy = await client.models.UserProfile.list({
+    filter: { username: { eq: sub } },
+    authMode: 'iam',
+  });
+  const merged = new Map<string, UserProfile>();
+  for (const profile of [...bySub.data, ...byLegacy.data]) {
+    merged.set(profile.id, profile);
+  }
+  return [...merged.values()];
+}
+
 /** Resolve a conversation/message participant id to a UserProfile row. */
 export async function findProfileForParticipant(
   client: DataClient,
@@ -21,39 +64,20 @@ export async function findProfileForParticipant(
   if (!raw) return null;
 
   if (isCognitoUuid(raw)) {
-    const bySub = await client.models.UserProfile.list({
-      filter: { cognitoSub: { eq: raw } },
-      authMode: 'iam',
-    });
-    const exact = bySub.data.find((profile) => profile.cognitoSub === raw);
-    if (exact) return exact;
-
     const handle = await resolveUsernameFromPool(raw);
     if (handle) {
-      const byUsername = await client.models.UserProfile.list({
-        filter: { username: { eq: handle } },
-        authMode: 'iam',
-      });
-      if (byUsername.data[0]) return byUsername.data[0];
+      const profiles = await listProfilesForUser(client, handle, raw);
+      return pickProfileForEmailAlerts(profiles, handle, raw);
     }
+
+    const profiles = await profilesForSub(client, raw);
+    return pickProfileForEmailAlerts(profiles, null, raw);
   }
 
   const handle = participantHandle(raw);
   if (!isCognitoUuid(handle)) {
-    const byUsername = await client.models.UserProfile.list({
-      filter: { username: { eq: handle } },
-      authMode: 'iam',
-    });
-    if (byUsername.data[0]) return byUsername.data[0];
-  }
-
-  // Legacy profile rows keyed by internal Cognito id in username.
-  if (isCognitoUuid(raw)) {
-    const byLegacy = await client.models.UserProfile.list({
-      filter: { username: { eq: raw } },
-      authMode: 'iam',
-    });
-    if (byLegacy.data[0]) return byLegacy.data[0];
+    const profiles = await listProfilesForUser(client, handle, '');
+    return pickProfileForEmailAlerts(profiles, handle, null);
   }
 
   return null;

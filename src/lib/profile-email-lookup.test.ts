@@ -6,17 +6,22 @@ import {
 
 describe('pickProfileForEmailAlerts', () => {
   it('prefers a duplicate row that has contactEmail', () => {
+    const timestamp = '2026-06-20T12:00:00.000Z';
     const legacy = {
       id: 'legacy',
       username: 'aaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       cognitoSub: 'aaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       contactEmail: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
     };
     const canonical = {
       id: 'canonical',
       username: 'lena',
       cognitoSub: 'aaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       contactEmail: 'lena@example.com',
+      createdAt: timestamp,
+      updatedAt: timestamp,
     };
 
     const picked = pickProfileForEmailAlerts(

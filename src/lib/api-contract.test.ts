@@ -10,7 +10,7 @@ import {
 } from '../../amplify/functions/shared/profile-sync-logic';
 
 describe('api-contract', () => {
-  it('amplify_outputs.json matches syncMyProfile contract', () => {
+  it('amplify_outputs.json matches client and email delivery contracts', () => {
     const issues = assertAmplifyOutputsMatchContract(
       outputs as Parameters<typeof assertAmplifyOutputsMatchContract>[0],
     );

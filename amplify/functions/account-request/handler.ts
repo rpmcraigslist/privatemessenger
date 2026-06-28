@@ -1,4 +1,4 @@
-import { SendEmailCommand, SESClient } from '@aws-sdk/client-ses';
+import { SendEmailCommand } from '@aws-sdk/client-ses';
 import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtime';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
@@ -15,10 +15,11 @@ import {
   formatSesFromAddress,
   resolveMessengerAppUrl,
 } from '../shared/message-alert-content';
+import { createSesClient } from '../shared/ses-client';
 
 type Handler = Schema['requestAccountAccess']['functionHandler'];
 
-const ses = new SESClient({});
+const ses = createSesClient();
 const dataClientPromise = getAmplifyDataClientConfig(
   env as Parameters<typeof getAmplifyDataClientConfig>[0],
 ).then(({ resourceConfig, libraryOptions }) => {

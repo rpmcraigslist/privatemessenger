@@ -128,14 +128,19 @@ export default function MessageComposer({
           });
           if (errors?.length) {
             console.error('message alert mutation failed', errors);
+          } else if (data && data.fromEmailConfigured === false) {
+            console.error(
+              'message alerts disabled — set MESSENGER_FROM_EMAIL in Amplify env vars and redeploy backend',
+              data,
+            );
           } else if (data && data.sent === 0 && (data.failed ?? 0) > 0) {
             console.error(
-              'message alert delivery failed — check SES config and CloudWatch logs',
+              'message alert delivery failed — check SES verified identities in us-east-2 and CloudWatch message-alerts logs',
               data,
             );
           } else if (data && data.sent === 0 && (data.skipped ?? 0) > 0) {
             console.info(
-              'message alert skipped — recipient has no contact email configured',
+              'message alert skipped — recipient needs a contact email in Profile (Profile settings, not Cognito login email)',
               data,
             );
           }

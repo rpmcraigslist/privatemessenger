@@ -30,8 +30,33 @@ export const REQUIRED_GRAPHQL_OPERATIONS = {
     'deleteMyMessage',
     'adminDeleteUser',
     'adminPurgeDirectChat',
+    'adminSendUserEmail',
+    'sendMessageAlerts',
     'upsertMyReadCursor',
   ] as const,
+} as const;
+
+/** GraphQL result shapes for email-related operations. */
+export const EMAIL_DELIVERY_CONTRACT = {
+  sendMessageAlerts: {
+    resultFields: [
+      'sent',
+      'failed',
+      'skipped',
+      'conversationId',
+      'fromEmailConfigured',
+    ] as const,
+  },
+  adminSendUserEmail: {
+    args: ['username', 'subject', 'bodyText'] as const,
+    resultFields: [
+      'sent',
+      'username',
+      'toEmail',
+      'message',
+      'fromEmailConfigured',
+    ] as const,
+  },
 } as const;
 
 export type SyncProfileMutationArg =
@@ -54,7 +79,13 @@ type OutputsIntrospection = {
     model_introspection?: {
       models?: Record<string, { fields?: Record<string, unknown> }>;
       queries?: Record<string, unknown>;
-      mutations?: Record<string, { arguments?: Record<string, unknown> }>;
+      mutations?: Record<
+        string,
+        {
+          arguments?: Record<string, unknown>;
+          type?: { nonModel?: string };
+        }
+      >;
       nonModels?: Record<string, { fields?: Record<string, unknown> }>;
     };
   };
@@ -125,6 +156,34 @@ export function assertAmplifyOutputsMatchContract(
   for (const name of REQUIRED_GRAPHQL_OPERATIONS.mutations) {
     if (!mutations[name]) {
       issues.push(`amplify_outputs.json is missing mutation "${name}"`);
+    }
+  }
+
+  for (const [mutationName, contract] of Object.entries(EMAIL_DELIVERY_CONTRACT)) {
+    const mutation = mutations[mutationName];
+    if (!mutation) continue;
+
+    const args = Object.keys(mutation.arguments ?? {});
+    if ('args' in contract) {
+      for (const arg of contract.args) {
+        if (!args.includes(arg)) {
+          issues.push(
+            `${mutationName} is missing argument "${arg}" in amplify_outputs.json`,
+          );
+        }
+      }
+    }
+
+    const resultTypeName = mutation.type?.nonModel;
+    const resultFields = Object.keys(
+      introspection.nonModels?.[resultTypeName ?? '']?.fields ?? {},
+    );
+    for (const field of contract.resultFields) {
+      if (!resultFields.includes(field)) {
+        issues.push(
+          `${resultTypeName ?? mutationName} is missing field "${field}" in amplify_outputs.json`,
+        );
+      }
     }
   }
 

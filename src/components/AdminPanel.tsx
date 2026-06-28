@@ -57,6 +57,9 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
   const [forceChange, setForceChange] = useState(true);
   const [purgeUserA, setPurgeUserA] = useState('paul');
   const [purgeUserB, setPurgeUserB] = useState('lena');
+  const [emailTargetUsername, setEmailTargetUsername] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
 
   async function loadUsers() {
     setLoading(true);
@@ -90,6 +93,14 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     void loadUsers();
     void loadAudit();
   }, [loadAudit]);
+
+  useEffect(() => {
+    if (emailTargetUsername) return;
+    const first = users.find((user) => user.contactEmail);
+    if (first) setEmailTargetUsername(first.username);
+  }, [users, emailTargetUsername]);
+
+  const emailableUsers = users.filter((user) => user.contactEmail);
 
   async function runBusy<T>(
     label: string,
@@ -149,6 +160,48 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       } catch (err) {
         console.error('adminCreateUser failed', err);
         setError(err instanceof Error ? err.message : 'Create failed');
+      }
+    });
+  }
+
+  async function sendAdminEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    if (!emailTargetUsername) {
+      setError('Choose a user with a contact email.');
+      return;
+    }
+    if (!emailSubject.trim()) {
+      setError('Enter a subject.');
+      return;
+    }
+    if (!emailBody.trim()) {
+      setError('Enter a message.');
+      return;
+    }
+
+    await runBusy('Sending email…', async () => {
+      try {
+        const { data, errors } = await client.mutations.adminSendUserEmail({
+          username: emailTargetUsername,
+          subject: emailSubject.trim(),
+          bodyText: emailBody.trim(),
+        });
+        if (errors?.length) throw new Error(errors[0].message);
+        if (!data) throw new Error('Send failed — no response from server.');
+
+        if (data.sent) {
+          setMessage(data.message);
+          setEmailSubject('');
+          setEmailBody('');
+        } else {
+          setError(data.message);
+        }
+      } catch (err) {
+        console.error('adminSendUserEmail failed', err);
+        setError(err instanceof Error ? err.message : 'Send failed');
       }
     });
   }
@@ -445,6 +498,56 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
                 Add user
               </button>
             </NoSaveForm>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="mb-2 font-medium">Send email</h3>
+            <p className="mb-3 text-xs text-[var(--color-muted)]">
+              Sends through Amazon SES to the user&apos;s Profile contact email.
+              Requires MESSENGER_FROM_EMAIL in Amplify (Ohio).
+            </p>
+            {emailableUsers.length === 0 ? (
+              <p className="text-sm text-[var(--color-muted)]">
+                No users have a contact email yet. Add one when creating a user
+                or in Profile settings.
+              </p>
+            ) : (
+              <form onSubmit={(e) => void sendAdminEmail(e)} className="space-y-2">
+                <select
+                  value={emailTargetUsername}
+                  onChange={(e) => setEmailTargetUsername(e.target.value)}
+                  className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                >
+                  {emailableUsers.map((user) => (
+                    <option key={user.loginId} value={user.username}>
+                      {formatUserHandle(user.username)} · {user.contactEmail}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Subject"
+                  className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                />
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder="Message"
+                  rows={5}
+                  className="w-full resize-y rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full rounded-full py-2 text-sm font-medium text-white disabled:opacity-50"
+                  style={{ background: 'var(--color-accent)' }}
+                >
+                  Send email
+                </button>
+              </form>
+            )}
           </section>
 
           <section className="mb-6">

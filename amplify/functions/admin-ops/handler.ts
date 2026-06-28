@@ -37,6 +37,15 @@ import {
   resolveCallerIdentity,
   toLoginId,
 } from '../shared/cognito';
+import {
+  buildAdminDirectEmailBodies,
+  resolveContactEmailForUsername,
+  validateAdminDirectEmailInput,
+} from '../shared/admin-email-logic';
+import {
+  isMessengerFromEmailConfigured,
+  sendSesEmail,
+} from '../shared/ses-email';
 
 const cognito = new CognitoIdentityProviderClient({});
 const dataClientPromise = getAmplifyDataClientConfig(
@@ -298,6 +307,8 @@ type AdminEvent = {
     contactEmail?: string | null;
     forcePasswordChange?: boolean | null;
     messageId?: string;
+    subject?: string;
+    bodyText?: string;
   };
 };
 
@@ -560,6 +571,89 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       }
       await deleteAllReadStates(client);
       return { deletedMessages, deletedConversations };
+    }
+    case 'adminSendUserEmail': {
+      const { username, subject, bodyText } = event.arguments;
+      if (!username) throw new Error('username is required');
+
+      const validation = validateAdminDirectEmailInput({
+        subject: subject ?? '',
+        bodyText: bodyText ?? '',
+      });
+      if (!validation.ok) {
+        throw new Error(validation.error);
+      }
+
+      const handle = username.trim().toLowerCase();
+      const fromConfigured = isMessengerFromEmailConfigured();
+      if (!fromConfigured) {
+        return {
+          sent: false,
+          username: handle,
+          message:
+            'Email is not configured. Set MESSENGER_FROM_EMAIL in Amplify environment variables and redeploy the backend.',
+          fromEmailConfigured: false,
+        };
+      }
+
+      const users = await listUsers();
+      if (!users.some((user) => user.username === handle)) {
+        throw new Error(`User "${handle}" not found`);
+      }
+
+      const client = await dataClientPromise;
+      const profiles = await client.models.UserProfile.list({ authMode: 'iam' });
+      const emailByHandle = new Map<string, string>();
+      for (const profile of profiles.data) {
+        const email = profile.contactEmail?.trim();
+        if (!email || email.toLowerCase().endsWith('@messenger.local')) continue;
+        emailByHandle.set(profile.username.trim().toLowerCase(), email);
+      }
+
+      const toEmail = resolveContactEmailForUsername(handle, emailByHandle);
+      if (!toEmail) {
+        return {
+          sent: false,
+          username: handle,
+          message: `${handle} has no contact email in Profile. Save one in Profile settings or set it when creating the user.`,
+          fromEmailConfigured: true,
+        };
+      }
+
+      const { textBody: emailText, htmlBody } = buildAdminDirectEmailBodies({
+        bodyText: validation.bodyText,
+        adminUsername: actor,
+      });
+
+      try {
+        await sendSesEmail({
+          toAddress: toEmail,
+          subject: validation.subject,
+          textBody: emailText,
+          htmlBody,
+        });
+        console.info('adminSendUserEmail: sent', {
+          username: handle,
+          toEmail: toEmail.replace(/(^.).*(@.*$)/, '$1***$2'),
+        });
+        return {
+          sent: true,
+          username: handle,
+          toEmail,
+          message: `Email sent to ${toEmail}.`,
+          fromEmailConfigured: true,
+        };
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : 'Unknown SES error';
+        console.error('adminSendUserEmail: send failed', { handle, toEmail, err });
+        return {
+          sent: false,
+          username: handle,
+          toEmail,
+          message: `Amazon SES rejected the send: ${detail}`,
+          fromEmailConfigured: true,
+        };
+      }
     }
     default:
       throw new Error(`Unknown admin operation: ${field}`);

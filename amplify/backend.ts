@@ -77,6 +77,20 @@ backend.adminOps.addEnvironment(
   'STORAGE_BUCKET_NAME',
   backend.storage.resources.bucket.bucketName,
 );
+backend.adminOps.addEnvironment(
+  'MESSENGER_FROM_EMAIL',
+  process.env.MESSENGER_FROM_EMAIL ?? '',
+);
+backend.adminOps.addEnvironment(
+  'MESSENGER_FROM_DISPLAY_NAME',
+  process.env.MESSENGER_FROM_DISPLAY_NAME ?? '',
+);
+backend.adminOps.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  }),
+);
 
 backend.messageAlerts.addEnvironment('USER_POOL_ID', poolId);
 backend.messageAlerts.addEnvironment(

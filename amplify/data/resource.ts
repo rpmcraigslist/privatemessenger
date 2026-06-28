@@ -157,6 +157,14 @@ const schema = a
       deletedConversations: a.integer().required(),
     }),
 
+    AdminSendUserEmailResult: a.customType({
+      sent: a.boolean().required(),
+      username: a.string().required(),
+      toEmail: a.string(),
+      message: a.string().required(),
+      fromEmailConfigured: a.boolean(),
+    }),
+
     DeleteMyMessageResult: a.customType({
       messageId: a.string().required(),
       deleted: a.boolean().required(),
@@ -169,6 +177,7 @@ const schema = a
       failed: a.integer(),
       skipped: a.integer(),
       conversationId: a.string(),
+      fromEmailConfigured: a.boolean(),
     }),
 
     AccountRequestResult: a.customType({
@@ -288,6 +297,17 @@ const schema = a
         usernameB: a.string().required(),
       })
       .returns(a.ref('AdminPurgeDirectChatResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminSendUserEmail: a
+      .mutation()
+      .arguments({
+        username: a.string().required(),
+        subject: a.string().required(),
+        bodyText: a.string().required(),
+      })
+      .returns(a.ref('AdminSendUserEmailResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

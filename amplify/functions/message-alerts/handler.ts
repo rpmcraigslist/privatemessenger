@@ -1,4 +1,3 @@
-import { SendEmailCommand, SESClient } from '@aws-sdk/client-ses';
 import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtime';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
@@ -8,7 +7,6 @@ import { isCognitoUuid, resolveCallerIdentity } from '../shared/cognito';
 import {
   buildMessageAlertEmail,
   buildMessengerDeepLink,
-  formatSesFromAddress,
   resolveMessengerAppUrl,
 } from '../shared/message-alert-content';
 import {
@@ -16,12 +14,16 @@ import {
   isParticipantSender,
   profileEmailTarget,
 } from '../shared/profiles';
+import {
+  isMessengerFromEmailConfigured,
+  messengerFromEmail,
+  sendSesEmail,
+} from '../shared/ses-email';
 
 type Handler = Schema['sendMessageAlerts']['functionHandler'];
 type DataClient = ReturnType<typeof generateClient<Schema>>;
 type MessageModel = Schema['Message']['type'];
 
-const ses = new SESClient({});
 const dataClientPromise = getAmplifyDataClientConfig(
   env as Parameters<typeof getAmplifyDataClientConfig>[0],
 ).then(({ resourceConfig, libraryOptions }) => {
@@ -36,11 +38,6 @@ function alertSenderLabel(
   const candidate = identityUsername ?? messageSenderUsername ?? '';
   if (!candidate || isCognitoUuid(candidate)) return 'someone';
   return candidate;
-}
-
-function fromEmailAddress(): string | null {
-  const value = process.env.MESSENGER_FROM_EMAIL?.trim();
-  return value || null;
 }
 
 async function loadMessage(
@@ -63,29 +60,12 @@ async function sendEmailAlert(
   openUrl: string,
   senderName: string,
 ): Promise<void> {
-  const from = fromEmailAddress();
-  if (!from) {
-    throw new Error('MESSENGER_FROM_EMAIL is not configured');
-  }
-
   const { subject, textBody, htmlBody } = buildMessageAlertEmail({
     openUrl,
     senderName,
   });
 
-  await ses.send(
-    new SendEmailCommand({
-      Source: formatSesFromAddress(from),
-      Destination: { ToAddresses: [toAddress] },
-      Message: {
-        Subject: { Data: subject, Charset: 'UTF-8' },
-        Body: {
-          Text: { Data: textBody, Charset: 'UTF-8' },
-          Html: { Data: htmlBody, Charset: 'UTF-8' },
-        },
-      },
-    }),
-  );
+  await sendSesEmail({ toAddress, subject, textBody, htmlBody });
 }
 
 export const handler: Handler = async (event) => {
@@ -100,7 +80,12 @@ export const handler: Handler = async (event) => {
   const message = await loadMessage(client, messageId);
   if (!message?.conversationId) {
     console.warn('sendMessageAlerts: message not found', messageId);
-    return { sent: 0, failed: 0, skipped: 0 };
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      fromEmailConfigured: isMessengerFromEmailConfigured(),
+    };
   }
 
   const { senderUsername, participantUsernames, conversationId } = message;
@@ -111,7 +96,7 @@ export const handler: Handler = async (event) => {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
-  const fromEmail = fromEmailAddress();
+  const fromEmail = messengerFromEmail();
 
   for (const participantId of participantUsernames ?? []) {
     if (!participantId) continue;
@@ -162,5 +147,11 @@ export const handler: Handler = async (event) => {
     fromEmailConfigured: Boolean(fromEmail),
   });
 
-  return { sent, failed, skipped, conversationId };
+  return {
+    sent,
+    failed,
+    skipped,
+    conversationId,
+    fromEmailConfigured: Boolean(fromEmail),
+  };
 };

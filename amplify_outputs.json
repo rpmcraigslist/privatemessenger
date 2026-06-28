@@ -611,10 +611,31 @@
               "isRequired": true,
               "attributes": []
             },
+            "failed": {
+              "name": "failed",
+              "isArray": false,
+              "type": "Int",
+              "isRequired": false,
+              "attributes": []
+            },
+            "skipped": {
+              "name": "skipped",
+              "isArray": false,
+              "type": "Int",
+              "isRequired": false,
+              "attributes": []
+            },
             "conversationId": {
               "name": "conversationId",
               "isArray": false,
               "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "fromEmailConfigured": {
+              "name": "fromEmailConfigured",
+              "isArray": false,
+              "type": "Boolean",
               "isRequired": false,
               "attributes": []
             }
@@ -691,6 +712,16 @@
             "usernameB": { "name": "usernameB", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
             "deletedMessages": { "name": "deletedMessages", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] },
             "deletedConversations": { "name": "deletedConversations", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] }
+          }
+        },
+        "AdminSendUserEmailResult": {
+          "name": "AdminSendUserEmailResult",
+          "fields": {
+            "sent": { "name": "sent", "isArray": false, "type": "Boolean", "isRequired": true, "attributes": [] },
+            "username": { "name": "username", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
+            "toEmail": { "name": "toEmail", "isArray": false, "type": "String", "isRequired": false, "attributes": [] },
+            "message": { "name": "message", "isArray": false, "type": "String", "isRequired": true, "attributes": [] },
+            "fromEmailConfigured": { "name": "fromEmailConfigured", "isArray": false, "type": "Boolean", "isRequired": false, "attributes": [] }
           }
         },
         "ReadCursorRow": {
@@ -912,6 +943,34 @@
             }
           }
         },
+        "adminSendUserEmail": {
+          "name": "adminSendUserEmail",
+          "isArray": false,
+          "type": {
+            "nonModel": "AdminSendUserEmailResult"
+          },
+          "isRequired": false,
+          "arguments": {
+            "username": {
+              "name": "username",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            },
+            "subject": {
+              "name": "subject",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            },
+            "bodyText": {
+              "name": "bodyText",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true
+            }
+          }
+        },
         "deleteMyMessage": {
           "name": "deleteMyMessage",
           "isArray": false,
@@ -941,6 +1000,12 @@
               "isArray": false,
               "type": "ID",
               "isRequired": true
+            },
+            "appUrl": {
+              "name": "appUrl",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
             }
           }
         },

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ADMIN_WELCOME_EMAIL_SUBJECT,
   buildAdminDirectEmailBodies,
+  buildAdminWelcomeEmailBody,
   resolveContactEmailForUsername,
   validateAdminDirectEmailInput,
 } from '../../amplify/functions/shared/admin-email-logic';
@@ -50,5 +52,20 @@ describe('admin-email-logic', () => {
     expect(textBody).toContain('Do not reply');
     expect(htmlBody).toContain('Line one<br>Line two');
     expect(htmlBody).toContain('Sent by paul via Private Messenger admin.');
+  });
+
+  it('builds welcome email subject and body', () => {
+    expect(ADMIN_WELCOME_EMAIL_SUBJECT).toBe('Welcome to private messenger');
+    const body = buildAdminWelcomeEmailBody({
+      appLoginUrl: 'https://main.example.com/',
+      username: 'lena',
+      temporaryPassword: 'TempPass123!',
+    });
+    expect(body).toContain('https://main.example.com');
+    expect(body).toContain('Your username is:');
+    expect(body).toContain('lena');
+    expect(body).toContain('Your temporary password is:');
+    expect(body).toContain('TempPass123!');
+    expect(body).toContain('change your password to something secure');
   });
 });

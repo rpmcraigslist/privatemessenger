@@ -1,6 +1,31 @@
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_BODY_LENGTH = 10_000;
 
+export const ADMIN_WELCOME_EMAIL_SUBJECT = 'Welcome to private messenger';
+
+export function normalizeAppLoginUrl(origin: string): string {
+  return origin.replace(/\/$/, '');
+}
+
+export function buildAdminWelcomeEmailBody(input: {
+  appLoginUrl: string;
+  username: string;
+  temporaryPassword: string;
+}): string {
+  return [
+    'The service can be found here:',
+    normalizeAppLoginUrl(input.appLoginUrl),
+    '',
+    'Your username is:',
+    input.username.trim(),
+    '',
+    'Your temporary password is:',
+    input.temporaryPassword,
+    '',
+    'You will be required to change your password to something secure.',
+  ].join('\n');
+}
+
 export type AdminDirectEmailInput = {
   subject: string;
   bodyText: string;

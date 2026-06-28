@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { client } from '../lib/amplify';
 import {
+  ADMIN_WELCOME_EMAIL_SUBJECT,
+  buildAdminWelcomeEmailBody,
+} from '../../amplify/functions/shared/admin-email-logic';
+import {
   contactEmailError,
   formatUserHandle,
   normalizeContactEmail,
@@ -57,9 +61,29 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
   const [forceChange, setForceChange] = useState(true);
   const [purgeUserA, setPurgeUserA] = useState('paul');
   const [purgeUserB, setPurgeUserB] = useState('lena');
-  const [emailTargetUsername, setEmailTargetUsername] = useState('');
+
+  const [sendEmailUser, setSendEmailUser] = useState<AdminUser | null>(null);
+  const [welcomeLink, setWelcomeLink] = useState(true);
+  const [welcomeTempPassword, setWelcomeTempPassword] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+
+  const appLoginUrl =
+    typeof window !== 'undefined' ? window.location.origin : 'https://example.com';
+
+  const applyWelcomeTemplate = useCallback(
+    (user: AdminUser, temporaryPassword: string) => {
+      setEmailSubject(ADMIN_WELCOME_EMAIL_SUBJECT);
+      setEmailBody(
+        buildAdminWelcomeEmailBody({
+          appLoginUrl,
+          username: user.username,
+          temporaryPassword,
+        }),
+      );
+    },
+    [appLoginUrl],
+  );
 
   async function loadUsers() {
     setLoading(true);
@@ -94,14 +118,6 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     void loadAudit();
   }, [loadAudit]);
 
-  useEffect(() => {
-    if (emailTargetUsername) return;
-    const first = users.find((user) => user.contactEmail);
-    if (first) setEmailTargetUsername(first.username);
-  }, [users, emailTargetUsername]);
-
-  const emailableUsers = users.filter((user) => user.contactEmail);
-
   async function runBusy<T>(
     label: string,
     action: () => Promise<T>,
@@ -112,6 +128,41 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
       return await action();
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openSendEmailDialog(user: AdminUser) {
+    setSendEmailUser(user);
+    setWelcomeLink(true);
+    setWelcomeTempPassword('');
+    applyWelcomeTemplate(user, '');
+    setError(null);
+  }
+
+  function closeSendEmailDialog() {
+    setSendEmailUser(null);
+    setWelcomeLink(true);
+    setWelcomeTempPassword('');
+    setEmailSubject('');
+    setEmailBody('');
+  }
+
+  function handleWelcomeLinkChange(checked: boolean) {
+    setWelcomeLink(checked);
+    if (!sendEmailUser) return;
+    if (checked) {
+      applyWelcomeTemplate(sendEmailUser, welcomeTempPassword);
+      return;
+    }
+    setWelcomeTempPassword('');
+    setEmailSubject('');
+    setEmailBody('');
+  }
+
+  function handleWelcomeTempPasswordChange(value: string) {
+    setWelcomeTempPassword(value);
+    if (welcomeLink && sendEmailUser) {
+      applyWelcomeTemplate(sendEmailUser, value);
     }
   }
 
@@ -166,11 +217,13 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
 
   async function sendAdminEmail(e: React.FormEvent) {
     e.preventDefault();
+    if (!sendEmailUser) return;
+
     setError(null);
     setMessage(null);
 
-    if (!emailTargetUsername) {
-      setError('Choose a user with a contact email.');
+    if (welcomeLink && !welcomeTempPassword.trim()) {
+      setError('Enter the temporary password for the welcome email.');
       return;
     }
     if (!emailSubject.trim()) {
@@ -185,7 +238,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     await runBusy('Sending email…', async () => {
       try {
         const { data, errors } = await client.mutations.adminSendUserEmail({
-          username: emailTargetUsername,
+          username: sendEmailUser.username,
           subject: emailSubject.trim(),
           bodyText: emailBody.trim(),
         });
@@ -194,8 +247,7 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
 
         if (data.sent) {
           setMessage(data.message);
-          setEmailSubject('');
-          setEmailBody('');
+          closeSendEmailDialog();
         } else {
           setError(data.message);
         }
@@ -346,278 +398,328 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
         className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
         onClick={onClose}
       >
-      <div
-        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-2xl bg-[var(--color-panel)] sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 className="text-lg font-semibold">Admin</h2>
-          <button
-            onClick={onClose}
-            className="text-[var(--color-muted)] hover:text-white"
-          >
-            ✕
-          </button>
-        </header>
+        <div
+          className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-2xl bg-[var(--color-panel)] sm:rounded-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <h2 className="text-lg font-semibold">Admin</h2>
+            <button
+              onClick={onClose}
+              className="text-[var(--color-muted)] hover:text-white"
+            >
+              ✕
+            </button>
+          </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          {message && (
-            <p className="mb-3 rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm text-[var(--color-accent)]">
-              {message}
-            </p>
-          )}
-          {error && (
-            <p className="mb-3 text-sm text-red-400">{error}</p>
-          )}
-
-          <section className="mb-6 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-panel-2)] px-3 py-3">
-            <h3 className="mb-1 font-medium text-[var(--color-accent)]">
-              Direct chat cleanup
-            </h3>
-            <p className="mb-3 text-sm text-[var(--color-muted)]">
-              Wipe every message and conversation between two users. User removal
-              in the list below already deletes their data cleanly.
-            </p>
-            <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  value={purgeUserA}
-                  onChange={(e) => setPurgeUserA(e.target.value)}
-                  placeholder="Username A"
-                  autoComplete="off"
-                  className="rounded-lg bg-[var(--color-app-bg)] px-3 py-2 text-sm outline-none"
-                />
-                <input
-                  value={purgeUserB}
-                  onChange={(e) => setPurgeUserB(e.target.value)}
-                  placeholder="Username B"
-                  autoComplete="off"
-                  className="rounded-lg bg-[var(--color-app-bg)] px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => void purgeDirectChat()}
-                disabled={busy}
-                className="w-full rounded-lg border border-amber-400/40 px-3 py-2 text-sm text-amber-300 hover:bg-amber-400/10 disabled:opacity-40"
-              >
-                Purge direct chat between two users
-              </button>
-            </div>
-          </section>
-
-          <section className="mb-6">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="font-medium">Data audit</h3>
-              <button
-                type="button"
-                onClick={() => void loadAudit()}
-                disabled={busy || auditLoading}
-                className="text-sm text-[var(--color-accent)] hover:underline disabled:opacity-40"
-              >
-                Refresh
-              </button>
-            </div>
-            {auditLoading && !audit ? (
-              <p className="text-sm text-[var(--color-muted)]">Checking data…</p>
-            ) : audit ? (
-              <div className="space-y-2 rounded-lg bg-[var(--color-panel-2)] px-3 py-3 text-sm">
-                <p>
-                  Cognito accounts: <strong>{audit.cognitoUsers.length}</strong>
-                </p>
-                <p>
-                  Profile rows in database: <strong>{audit.profileRows.length}</strong>
-                </p>
-                {audit.duplicateProfileHandles.length > 0 ? (
-                  <p className="text-amber-300">
-                    Duplicate profile handles:{' '}
-                    {audit.duplicateProfileHandles.join(', ')}
-                  </p>
-                ) : (
-                  <p className="text-[var(--color-muted)]">
-                    No duplicate profile handles found.
-                  </p>
-                )}
-                {audit.duplicateDirectChats.length > 0 ? (
-                  <p className="text-amber-300">
-                    Duplicate 1:1 chats: {audit.duplicateDirectChats.length} pair(s)
-                  </p>
-                ) : (
-                  <p className="text-[var(--color-muted)]">
-                    No duplicate 1:1 chats found.
-                  </p>
-                )}
-                {audit.profileRows.some((row) => row.orphan) && (
-                  <p className="text-amber-300">
-                    Orphan profile rows detected. Remove the affected user to
-                    clean them up.
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </section>
-
-          <section className="mb-6">
-            <h3 className="mb-2 font-medium">Add user</h3>
-            <NoSaveForm onSubmit={(e) => void createUser(e)} className="space-y-2">
-              <NoSaveField
-                value={newUsername}
-                onChange={setNewUsername}
-                placeholder="Username"
-                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
-              />
-              <NoSaveField
-                type="password"
-                value={tempPassword}
-                onChange={setTempPassword}
-                placeholder="Temporary password"
-                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
-              />
-              <input
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="Email address (optional)"
-                autoComplete="email"
-                className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
-              />
-              <label className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
-                <input
-                  type="checkbox"
-                  checked={forceChange}
-                  onChange={(e) => setForceChange(e.target.checked)}
-                />
-                Require password change on first sign-in
-              </label>
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full rounded-full py-2 text-sm font-medium text-white disabled:opacity-50"
-                style={{ background: 'var(--color-accent)' }}
-              >
-                Add user
-              </button>
-            </NoSaveForm>
-          </section>
-
-          <section className="mb-6">
-            <h3 className="mb-2 font-medium">Send email</h3>
-            <p className="mb-3 text-xs text-[var(--color-muted)]">
-              Sends through Amazon SES to the user&apos;s Profile contact email.
-              Requires MESSENGER_FROM_EMAIL in Amplify (Ohio).
-            </p>
-            {emailableUsers.length === 0 ? (
-              <p className="text-sm text-[var(--color-muted)]">
-                No users have a contact email yet. Add one when creating a user
-                or in Profile settings.
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            {message && (
+              <p className="mb-3 rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm text-[var(--color-accent)]">
+                {message}
               </p>
-            ) : (
-              <form onSubmit={(e) => void sendAdminEmail(e)} className="space-y-2">
-                <select
-                  value={emailTargetUsername}
-                  onChange={(e) => setEmailTargetUsername(e.target.value)}
-                  className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+            )}
+            {error && !sendEmailUser && (
+              <p className="mb-3 text-sm text-red-400">{error}</p>
+            )}
+
+            <section className="mb-6 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-panel-2)] px-3 py-3">
+              <h3 className="mb-1 font-medium text-[var(--color-accent)]">
+                Direct chat cleanup
+              </h3>
+              <p className="mb-3 text-sm text-[var(--color-muted)]">
+                Wipe every message and conversation between two users. User removal
+                in the list below already deletes their data cleanly.
+              </p>
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={purgeUserA}
+                    onChange={(e) => setPurgeUserA(e.target.value)}
+                    placeholder="Username A"
+                    autoComplete="off"
+                    className="rounded-lg bg-[var(--color-app-bg)] px-3 py-2 text-sm outline-none"
+                  />
+                  <input
+                    value={purgeUserB}
+                    onChange={(e) => setPurgeUserB(e.target.value)}
+                    placeholder="Username B"
+                    autoComplete="off"
+                    className="rounded-lg bg-[var(--color-app-bg)] px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void purgeDirectChat()}
+                  disabled={busy}
+                  className="w-full rounded-lg border border-amber-400/40 px-3 py-2 text-sm text-amber-300 hover:bg-amber-400/10 disabled:opacity-40"
                 >
-                  {emailableUsers.map((user) => (
-                    <option key={user.loginId} value={user.username}>
-                      {formatUserHandle(user.username)} · {user.contactEmail}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Subject"
+                  Purge direct chat between two users
+                </button>
+              </div>
+            </section>
+
+            <section className="mb-6">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="font-medium">Data audit</h3>
+                <button
+                  type="button"
+                  onClick={() => void loadAudit()}
+                  disabled={busy || auditLoading}
+                  className="text-sm text-[var(--color-accent)] hover:underline disabled:opacity-40"
+                >
+                  Refresh
+                </button>
+              </div>
+              {auditLoading && !audit ? (
+                <p className="text-sm text-[var(--color-muted)]">Checking data…</p>
+              ) : audit ? (
+                <div className="space-y-2 rounded-lg bg-[var(--color-panel-2)] px-3 py-3 text-sm">
+                  <p>
+                    Cognito accounts: <strong>{audit.cognitoUsers.length}</strong>
+                  </p>
+                  <p>
+                    Profile rows in database: <strong>{audit.profileRows.length}</strong>
+                  </p>
+                  {audit.duplicateProfileHandles.length > 0 ? (
+                    <p className="text-amber-300">
+                      Duplicate profile handles:{' '}
+                      {audit.duplicateProfileHandles.join(', ')}
+                    </p>
+                  ) : (
+                    <p className="text-[var(--color-muted)]">
+                      No duplicate profile handles found.
+                    </p>
+                  )}
+                  {audit.duplicateDirectChats.length > 0 ? (
+                    <p className="text-amber-300">
+                      Duplicate 1:1 chats: {audit.duplicateDirectChats.length} pair(s)
+                    </p>
+                  ) : (
+                    <p className="text-[var(--color-muted)]">
+                      No duplicate 1:1 chats found.
+                    </p>
+                  )}
+                  {audit.profileRows.some((row) => row.orphan) && (
+                    <p className="text-amber-300">
+                      Orphan profile rows detected. Remove the affected user to
+                      clean them up.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="mb-6">
+              <h3 className="mb-2 font-medium">Add user</h3>
+              <NoSaveForm onSubmit={(e) => void createUser(e)} className="space-y-2">
+                <NoSaveField
+                  value={newUsername}
+                  onChange={setNewUsername}
+                  placeholder="Username"
                   className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
                 />
-                <textarea
-                  value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
-                  placeholder="Message"
-                  rows={5}
-                  className="w-full resize-y rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                <NoSaveField
+                  type="password"
+                  value={tempPassword}
+                  onChange={setTempPassword}
+                  placeholder="Temporary password"
+                  className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
                 />
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Email address (optional)"
+                  autoComplete="email"
+                  className="w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
+                />
+                <label className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={forceChange}
+                    onChange={(e) => setForceChange(e.target.checked)}
+                  />
+                  Require password change on first sign-in
+                </label>
                 <button
                   type="submit"
                   disabled={busy}
                   className="w-full rounded-full py-2 text-sm font-medium text-white disabled:opacity-50"
                   style={{ background: 'var(--color-accent)' }}
                 >
-                  Send email
+                  Add user
                 </button>
-              </form>
-            )}
-          </section>
+              </NoSaveForm>
+            </section>
 
-          <section className="mb-6">
-            <h3 className="mb-2 font-medium">Users</h3>
-            {loading ? (
-              <p className="text-sm text-[var(--color-muted)]">Loading…</p>
-            ) : (
-              <ul className="space-y-2">
-                {users.map((u) => (
-                  <li
-                    key={u.loginId}
-                    className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-medium">{formatUserHandle(u.username)}</p>
-                        <p className="text-xs text-[var(--color-muted)]">
-                          {u.status === 'FORCE_CHANGE_PASSWORD'
-                            ? 'Must change password on login'
-                            : u.status}
-                          {u.contactEmail ? ` · ${u.contactEmail}` : ''}
-                        </p>
+            <section className="mb-6">
+              <h3 className="mb-2 font-medium">Users</h3>
+              {loading ? (
+                <p className="text-sm text-[var(--color-muted)]">Loading…</p>
+              ) : (
+                <ul className="space-y-2">
+                  {users.map((u) => (
+                    <li
+                      key={u.loginId}
+                      className="rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium">{formatUserHandle(u.username)}</p>
+                          <p className="text-xs text-[var(--color-muted)]">
+                            {u.status === 'FORCE_CHANGE_PASSWORD'
+                              ? 'Must change password on login'
+                              : u.status}
+                            {u.contactEmail ? ` · ${u.contactEmail}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {u.contactEmail ? (
+                            <button
+                              type="button"
+                              onClick={() => openSendEmailDialog(u)}
+                              disabled={busy}
+                              className="text-[var(--color-accent)] hover:underline disabled:opacity-40"
+                            >
+                              Send email
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => void forcePasswordChange(u.username)}
+                            disabled={busy}
+                            className="text-[var(--color-accent)] hover:underline disabled:opacity-40"
+                          >
+                            Reset password
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeUser(u.username)}
+                            disabled={busy}
+                            className="text-red-400 hover:text-red-300 disabled:opacity-40"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => void forcePasswordChange(u.username)}
-                          disabled={busy}
-                          className="text-[var(--color-accent)] hover:underline disabled:opacity-40"
-                        >
-                          Reset password
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void removeUser(u.username)}
-                          disabled={busy}
-                          className="text-red-400 hover:text-red-300 disabled:opacity-40"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
-          <section>
-            <h3 className="mb-2 font-medium text-red-400">Danger zone</h3>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => void clearMessages()}
-                disabled={busy}
-                className="rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 disabled:opacity-40"
-              >
-                Clear all messages
-              </button>
-              <button
-                onClick={() => void purgeUsers()}
-                disabled={busy}
-                className="rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 disabled:opacity-40"
-              >
-                Remove all users (except you)
-              </button>
-            </div>
-          </section>
+            <section>
+              <h3 className="mb-2 font-medium text-red-400">Danger zone</h3>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => void clearMessages()}
+                  disabled={busy}
+                  className="rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 disabled:opacity-40"
+                >
+                  Clear all messages
+                </button>
+                <button
+                  onClick={() => void purgeUsers()}
+                  disabled={busy}
+                  className="rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 disabled:opacity-40"
+                >
+                  Remove all users (except you)
+                </button>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
-    </div>
+
+      {sendEmailUser && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+          onClick={closeSendEmailDialog}
+        >
+          <div
+            className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-2xl bg-[var(--color-panel)] sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div>
+                <h2 className="text-lg font-semibold">Send email</h2>
+                <p className="text-xs text-[var(--color-muted)]">
+                  To {formatUserHandle(sendEmailUser.username)} · {sendEmailUser.contactEmail}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSendEmailDialog}
+                className="text-[var(--color-muted)] hover:text-white"
+              >
+                ✕
+              </button>
+            </header>
+
+            <form
+              onSubmit={(e) => void sendAdminEmail(e)}
+              className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+            >
+              {error && (
+                <p className="mb-3 text-sm text-red-400">{error}</p>
+              )}
+
+              <label className="mb-3 flex items-center gap-2 text-sm text-[var(--color-muted)]">
+                <input
+                  type="checkbox"
+                  checked={welcomeLink}
+                  onChange={(e) => handleWelcomeLinkChange(e.target.checked)}
+                />
+                Welcome link
+              </label>
+
+              {welcomeLink && (
+                <NoSaveField
+                  type="password"
+                  value={welcomeTempPassword}
+                  onChange={handleWelcomeTempPasswordChange}
+                  placeholder="Temporary password"
+                  className="mb-3 w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+                />
+              )}
+
+              <input
+                type="text"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Subject"
+                className="mb-3 w-full rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+              />
+              <textarea
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                placeholder="Message"
+                rows={10}
+                className="mb-4 w-full resize-y rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeSendEmailDialog}
+                  disabled={busy}
+                  className="flex-1 rounded-full border border-white/20 py-2 text-sm text-[var(--color-muted)] hover:text-white disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="flex-1 rounded-full py-2 text-sm font-medium text-white disabled:opacity-50"
+                  style={{ background: 'var(--color-accent)' }}
+                >
+                  Send email
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

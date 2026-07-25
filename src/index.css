@@ -63,7 +63,9 @@ body {
 }
 
 /* Full-height app shell: row so list + chat sit side-by-side on desktop.
-   On mobile one pane is hidden, so the other still fills the viewport. */
+   On mobile one pane is hidden, so the other still fills the viewport.
+   Width rules live here (not only Tailwind) so the chat pane cannot be
+   pushed off-screen when the list uses width:100% on narrow layouts. */
 .app-viewport {
   box-sizing: border-box;
   display: flex;
@@ -76,11 +78,62 @@ body {
   overflow: hidden;
 }
 
-.chat-view {
-  position: relative;
+.messenger-sidebar {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  border-right: 1px solid rgba(0, 0, 0, 0.3);
+  background: var(--color-panel);
+}
+
+.messenger-sidebar.is-chat-open {
+  display: none;
+}
+
+.messenger-main {
+  box-sizing: border-box;
+  display: none;
+  flex: 1 1 auto;
+  flex-direction: column;
   height: 100%;
   max-height: 100%;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.messenger-main.is-chat-open {
+  display: flex;
+}
+
+@media (min-width: 768px) {
+  .messenger-sidebar,
+  .messenger-sidebar.is-chat-open {
+    display: flex;
+    width: 380px;
+    max-width: 380px;
+    flex: 0 0 380px;
+  }
+
+  .messenger-main,
+  .messenger-main.is-chat-open {
+    display: flex;
+  }
+}
+
+.chat-view {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   --chat-top-height: 3.5rem;
   --chat-composer-height: 4.5rem;

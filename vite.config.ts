@@ -11,6 +11,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Manual registerSW in src/lib/pwa-update.ts (avoid double registration).
+      injectRegister: false,
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Private Messenger',
@@ -36,6 +38,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallbackDenylist: [/^\/amplify_outputs\.json$/],
         importScripts: ['notification-sw.js'],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

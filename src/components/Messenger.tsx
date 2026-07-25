@@ -1087,15 +1087,11 @@ export default function Messenger({ onSignOut }: Props) {
 
   return (
 
-    <div className="app-viewport flex bg-[var(--color-app-bg)]">
+    <div className="app-viewport bg-[var(--color-app-bg)]">
 
       <aside
 
-        className={`${
-
-          selectedId ? 'hidden md:flex' : 'flex'
-
-        } h-full min-h-0 w-full flex-col border-r border-black/30 bg-[var(--color-panel)] md:w-[380px] md:max-w-[380px] md:shrink-0`}
+        className={`messenger-sidebar${selectedId ? ' is-chat-open' : ''}`}
 
       >
 
@@ -1139,11 +1135,7 @@ export default function Messenger({ onSignOut }: Props) {
 
       <main
 
-        className={`${
-
-          selectedId ? 'flex' : 'hidden md:flex'
-
-        } h-full min-h-0 max-h-full min-w-0 flex-1 flex-col overflow-hidden`}
+        className={`messenger-main${selectedId ? ' is-chat-open' : ''}`}
 
       >
 

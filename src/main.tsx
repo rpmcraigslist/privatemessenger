@@ -2,10 +2,12 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initAmplify } from './lib/amplify';
 import { captureDeepLinkFromUrl } from './lib/deep-link';
+import { startPwaAutoUpdate } from './lib/pwa-update';
 import './index.css';
 import App from './App';
 
 captureDeepLinkFromUrl();
+startPwaAutoUpdate();
 
 function BootstrapShell() {
   return (

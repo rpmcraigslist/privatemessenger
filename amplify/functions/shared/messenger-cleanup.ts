@@ -150,6 +150,59 @@ export type DeleteMessageCleanupResult = {
   conversationDeleted: boolean;
 };
 
+export type EditMessageResult = {
+  messageId: string;
+  content: string | null;
+  editedAt: string;
+  conversationId: string | null;
+};
+
+/** Update message text and refresh conversation preview when this is the latest message. */
+export async function editMessageContent(
+  client: DataClient,
+  message: Schema['Message']['type'],
+  content: string | null,
+): Promise<EditMessageResult> {
+  const editedAt = new Date().toISOString();
+  const { data: updated, errors } = await client.models.Message.update(
+    {
+      id: message.id,
+      content,
+      editedAt,
+    },
+    { authMode: 'iam' },
+  );
+  if (errors?.length) {
+    throw new Error(errors[0].message ?? 'Failed to update message');
+  }
+
+  const conversationId = message.conversationId ?? null;
+  if (conversationId) {
+    const remaining = await listMessagesForConversation(client, conversationId);
+    const newest = latestMessage(remaining);
+    if (newest?.id === message.id) {
+      await client.models.Conversation.update(
+        {
+          id: conversationId,
+          lastMessage: messageListPreview({
+            content,
+            type: newest.type,
+            attachmentName: newest.attachmentName,
+          }),
+        },
+        { authMode: 'iam' },
+      );
+    }
+  }
+
+  return {
+    messageId: message.id,
+    content: updated?.content ?? content,
+    editedAt: updated?.editedAt ?? editedAt,
+    conversationId,
+  };
+}
+
 /** Delete one message and drop or refresh its conversation when needed. */
 export async function deleteMessageAndMaintainConversation(
   client: DataClient,

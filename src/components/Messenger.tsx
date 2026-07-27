@@ -841,6 +841,33 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
+  const handleMessageUpdated = useCallback((message: MessageModel) => {
+    if (!message.id) return;
+
+    setAllMessages((prev) => mergeMessages(prev, [message]));
+
+    if (!message.conversationId) return;
+
+    setLatestByConversation((prev) => {
+      const current = prev.get(message.conversationId!);
+      if (
+        current &&
+        message.createdAt &&
+        new Date(current.at).getTime() > new Date(message.createdAt).getTime()
+      ) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.set(message.conversationId!, {
+        preview: messageListPreview(message),
+        at: message.createdAt ?? current?.at ?? new Date().toISOString(),
+      });
+      return next;
+    });
+  }, []);
+
+
+
   const handleMessageDeleted = useCallback(
     (result: {
       messageId: string;
@@ -1184,6 +1211,8 @@ export default function Messenger({ onSignOut }: Props) {
             }
 
             onMessageCreated={handleMessageCreated}
+
+            onMessageUpdated={handleMessageUpdated}
 
             onMessageDeleted={handleMessageDeleted}
 

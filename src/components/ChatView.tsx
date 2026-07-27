@@ -37,6 +37,10 @@ import {
   bubbleStyleForColor,
   resolveSenderBubbleColor,
 } from '../lib/message-bubble-colors';
+import {
+  MAX_MESSAGE_CONTENT_LENGTH,
+  validateMessageEdit,
+} from '../../amplify/functions/shared/edit-message-logic';
 
 import { DEEP_LINK_MESSAGE_NOT_FOUND, isDeepLinkMessageMissing } from '../lib/deep-link';
 
@@ -84,6 +88,8 @@ type Props = {
   onConversationRenamed: (name: string | null) => void;
 
   onMessageCreated?: (message: MessageModel) => void;
+
+  onMessageUpdated?: (message: MessageModel) => void;
 
   onMessageDeleted?: (result: {
     messageId: string;
@@ -150,6 +156,8 @@ export default function ChatView({
 
   onMessageCreated,
 
+  onMessageUpdated,
+
   onMessageDeleted,
 
   focusMessageId,
@@ -178,6 +186,12 @@ export default function ChatView({
 
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const [editingMessage, setEditingMessage] = useState<MessageModel | null>(null);
+
+  const [editDraft, setEditDraft] = useState('');
+
+  const [editBusy, setEditBusy] = useState(false);
+
   useEffect(() => {
     if (!chatBackRef) return;
 
@@ -190,6 +204,12 @@ export default function ChatView({
         if (searchOpen) {
           setSearchOpen(false);
           setSearchQuery('');
+          return true;
+        }
+        if (editingMessage) {
+          setEditingMessage(null);
+          setEditDraft('');
+          setActionError(null);
           return true;
         }
         if (replyTo) {
@@ -207,7 +227,7 @@ export default function ChatView({
     return () => {
       chatBackRef.current = null;
     };
-  }, [chatBackRef, messageMenu, replyTo, searchOpen, showDetails]);
+  }, [chatBackRef, editingMessage, messageMenu, replyTo, searchOpen, showDetails]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatViewRef = useRef<HTMLDivElement>(null);
@@ -339,6 +359,10 @@ export default function ChatView({
 
     setMessageMenu(null);
 
+    setEditingMessage(null);
+
+    setEditDraft('');
+
     setActionError(null);
 
   }, [conversation.id]);
@@ -364,7 +388,7 @@ export default function ChatView({
     observer.observe(top);
     observer.observe(composer);
     return () => observer.disconnect();
-  }, [actionError, conversation.id, replyTo, searchOpen]);
+  }, [actionError, conversation.id, editingMessage, replyTo, searchOpen]);
 
 
 
@@ -485,6 +509,59 @@ export default function ChatView({
       window.setTimeout(() => setCopyFeedback(null), 1800);
     }
   }, []);
+
+  const beginEditMessage = useCallback((message: MessageModel) => {
+    setMessageMenu(null);
+    setActionError(null);
+    setReplyTo(null);
+    setEditingMessage(message);
+    setEditDraft(message.content ?? '');
+  }, []);
+
+  const cancelEditMessage = useCallback(() => {
+    setEditingMessage(null);
+    setEditDraft('');
+    setActionError(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingMessage || editBusy) return;
+
+    const validated = validateMessageEdit({
+      content: editDraft,
+      hasAttachment: Boolean(editingMessage.attachmentKey),
+    });
+    if (!validated.ok) {
+      setActionError(validated.error);
+      return;
+    }
+
+    setEditBusy(true);
+    setActionError(null);
+    try {
+      const { data, errors } = await client.mutations.editMyMessage({
+        messageId: editingMessage.id,
+        content: validated.content ?? '',
+      });
+      if (errors?.length) throw new Error(errors[0].message);
+      if (!data?.updated) throw new Error('Edit failed');
+
+      onMessageUpdated?.({
+        ...editingMessage,
+        content: data.content ?? validated.content,
+        editedAt: data.editedAt ?? new Date().toISOString(),
+      });
+      setEditingMessage(null);
+      setEditDraft('');
+    } catch (err) {
+      console.error('edit message failed', err);
+      setActionError(
+        err instanceof Error ? err.message : 'Could not edit message',
+      );
+    } finally {
+      setEditBusy(false);
+    }
+  }, [editBusy, editDraft, editingMessage, onMessageUpdated]);
 
 
 
@@ -1304,7 +1381,42 @@ export default function ChatView({
 
       )}
 
-
+      {editingMessage ? (
+        <div className="border-t border-black/30 px-3 py-2">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-[var(--color-accent)]">
+              Edit message
+            </p>
+            <button
+              type="button"
+              onClick={cancelEditMessage}
+              disabled={editBusy}
+              className="text-xs text-[var(--color-muted)] hover:text-white disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+          <textarea
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+            rows={3}
+            maxLength={MAX_MESSAGE_CONTENT_LENGTH}
+            disabled={editBusy}
+            className="mb-2 w-full resize-y rounded-lg bg-[var(--color-panel-2)] px-3 py-2 text-sm outline-none placeholder:text-[var(--color-muted)] disabled:opacity-50"
+            placeholder="Message text"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => void handleSaveEdit()}
+            disabled={editBusy}
+            className="w-full rounded-full py-2 text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: 'var(--color-accent)' }}
+          >
+            {editBusy ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      ) : (
 
       <MessageComposer
 
@@ -1330,11 +1442,15 @@ export default function ChatView({
 
       />
 
+      )}
+
       </section>
 
 
 
       {deleteBusyId && <BusyOverlay label="Deleting message…" />}
+
+      {editBusy && <BusyOverlay label="Saving edit…" />}
 
       {copyFeedback && (
         <div className="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
@@ -1357,6 +1473,8 @@ export default function ChatView({
           }}
 
           onCopy={() => void handleCopyMessage(messageMenu.message)}
+
+          onEdit={() => beginEditMessage(messageMenu.message)}
 
           onDelete={() => void handleDeleteMessage(messageMenu.message)}
 
@@ -1450,6 +1568,8 @@ function MessageActionMenu({
 
   onCopy,
 
+  onEdit,
+
   onDelete,
 
 }: {
@@ -1459,6 +1579,8 @@ function MessageActionMenu({
   onReply: () => void;
 
   onCopy: () => void;
+
+  onEdit: () => void;
 
   onDelete: () => void;
 
@@ -1537,6 +1659,24 @@ function MessageActionMenu({
         >
 
           Copy
+
+        </button>
+
+      )}
+
+      {menu.mine && (
+
+        <button
+
+          type="button"
+
+          onClick={onEdit}
+
+          className="flex w-full px-4 py-2.5 text-left text-sm hover:bg-white/10"
+
+        >
+
+          Edit
 
         </button>
 
@@ -1843,6 +1983,8 @@ function Bubble({
           </button>
 
           <span className="text-[10px]" style={{ color: bubbleSurface.mutedColor }}>
+
+            {message.editedAt ? 'Edited · ' : ''}
 
             {formatTime(message.createdAt)}
 

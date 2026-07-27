@@ -28,6 +28,7 @@ export const REQUIRED_GRAPHQL_OPERATIONS = {
   mutations: [
     'syncMyProfile',
     'deleteMyMessage',
+    'editMyMessage',
     'adminDeleteUser',
     'adminPurgeDirectChat',
     'adminSendUserEmail',

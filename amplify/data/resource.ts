@@ -56,6 +56,7 @@ const schema = a
         replyToMessageId: a.id(),
         replyToSenderUsername: a.string(),
         replyToContentPreview: a.string(),
+        editedAt: a.datetime(),
       })
       .secondaryIndexes((index) => [index('conversationId')])
       .authorization((allow) => [
@@ -170,6 +171,14 @@ const schema = a
       deleted: a.boolean().required(),
       conversationId: a.string(),
       conversationDeleted: a.boolean().required(),
+    }),
+
+    EditMyMessageResult: a.customType({
+      messageId: a.string().required(),
+      updated: a.boolean().required(),
+      content: a.string(),
+      editedAt: a.string(),
+      conversationId: a.string(),
     }),
 
     MessageAlertsResult: a.customType({
@@ -315,6 +324,16 @@ const schema = a
       .mutation()
       .arguments({ messageId: a.id().required() })
       .returns(a.ref('DeleteMyMessageResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    editMyMessage: a
+      .mutation()
+      .arguments({
+        messageId: a.id().required(),
+        content: a.string().required(),
+      })
+      .returns(a.ref('EditMyMessageResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

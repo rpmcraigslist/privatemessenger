@@ -377,6 +377,13 @@
               "isRequired": false,
               "attributes": []
             },
+            "editedAt": {
+              "name": "editedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": []
+            },
             "createdAt": {
               "name": "createdAt",
               "isArray": false,
@@ -597,6 +604,46 @@
               "isArray": false,
               "type": "Boolean",
               "isRequired": true,
+              "attributes": []
+            }
+          }
+        },
+        "EditMyMessageResult": {
+          "name": "EditMyMessageResult",
+          "fields": {
+            "messageId": {
+              "name": "messageId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "updated": {
+              "name": "updated",
+              "isArray": false,
+              "type": "Boolean",
+              "isRequired": true,
+              "attributes": []
+            },
+            "content": {
+              "name": "content",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "editedAt": {
+              "name": "editedAt",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "conversationId": {
+              "name": "conversationId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
               "attributes": []
             }
           }
@@ -983,6 +1030,28 @@
               "name": "messageId",
               "isArray": false,
               "type": "ID",
+              "isRequired": true
+            }
+          }
+        },
+        "editMyMessage": {
+          "name": "editMyMessage",
+          "isArray": false,
+          "type": {
+            "nonModel": "EditMyMessageResult"
+          },
+          "isRequired": false,
+          "arguments": {
+            "messageId": {
+              "name": "messageId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true
+            },
+            "content": {
+              "name": "content",
+              "isArray": false,
+              "type": "String",
               "isRequired": true
             }
           }

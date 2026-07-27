@@ -28,7 +28,9 @@ import {
   deleteMessageAndMaintainConversation,
   deleteMessageRecord,
   deleteProfilesForIdentity,
+  editMessageContent,
 } from '../shared/messenger-cleanup';
+import { validateMessageEdit } from '../shared/edit-message-logic';
 import {
   fromLoginId,
   isAdminGroupMember,
@@ -307,6 +309,7 @@ type AdminEvent = {
     contactEmail?: string | null;
     forcePasswordChange?: boolean | null;
     messageId?: string;
+    content?: string;
     subject?: string;
     bodyText?: string;
   };
@@ -358,6 +361,55 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       deleted: true,
       conversationId: cleanup.conversationId,
       conversationDeleted: cleanup.conversationDeleted,
+    };
+  }
+
+  if (field === 'editMyMessage') {
+    const messageId = event.arguments.messageId;
+    if (!messageId) throw new Error('messageId is required');
+    if (typeof event.arguments.content !== 'string') {
+      throw new Error('content is required');
+    }
+
+    const { username, sub } = await resolveCallerIdentity(event.identity);
+    if (!sub) throw new Error('Unauthorized');
+
+    const client = await dataClientPromise;
+    const { data: message } = await client.models.Message.get(
+      { id: messageId },
+      { authMode: 'iam' },
+    );
+    if (!message) throw new Error('Message not found');
+
+    if (!isMessageSender(message.senderUsername, sub, username)) {
+      throw new Error('You can only edit your own messages');
+    }
+
+    const validated = validateMessageEdit({
+      content: event.arguments.content,
+      hasAttachment: Boolean(message.attachmentKey),
+    });
+    if (!validated.ok) throw new Error(validated.error);
+
+    const current = (message.content ?? '').trim();
+    const next = validated.content ?? '';
+    if (current === next) {
+      return {
+        messageId,
+        updated: true,
+        content: message.content ?? null,
+        editedAt: message.editedAt ?? null,
+        conversationId: message.conversationId ?? null,
+      };
+    }
+
+    const edited = await editMessageContent(client, message, validated.content);
+    return {
+      messageId: edited.messageId,
+      updated: true,
+      content: edited.content,
+      editedAt: edited.editedAt,
+      conversationId: edited.conversationId,
     };
   }
 

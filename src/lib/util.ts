@@ -319,6 +319,41 @@ export function buildHandleToSubDirectory(
   return map;
 }
 
+function resolveParticipantSub(
+  participant: string,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): string {
+  const knownSubs = new Set<string>([mySub, ...handleToSub.values()]);
+
+  if (isCognitoUuid(participant)) {
+    // Prefer the directory's canonical sub when this UUID is already known.
+    for (const sub of knownSubs) {
+      if (sub.toLowerCase() === participant.toLowerCase()) return sub;
+    }
+    return participant;
+  }
+
+  const value = participant.toLowerCase();
+  const handle = myUsername.toLowerCase();
+  const loginId = toLoginId(myUsername).toLowerCase();
+  if (
+    value === mySub.toLowerCase() ||
+    value === handle ||
+    value === loginId
+  ) {
+    return mySub;
+  }
+
+  const bareHandle = normalizeProfileHandle(participant);
+  if (bareHandle && handleToSub.has(bareHandle)) {
+    return handleToSub.get(bareHandle)!;
+  }
+
+  return participant;
+}
+
 /** Normalize conversation participant ids to Cognito subs for owner auth. */
 export function repairParticipantSubs(
   participants: string[],
@@ -331,6 +366,8 @@ export function repairParticipantSubs(
     .map((participant) =>
       resolveParticipantSub(participant, myUsername, mySub, handleToSub),
     );
+  // Sender must always be on the ACL or peers cannot read what they send.
+  mapped.push(mySub);
   return [...new Set(mapped)];
 }
 
@@ -373,33 +410,6 @@ export function directConversationPeerKey(
   );
   if (subs.length !== 2) return null;
   return subs.slice().sort().join(':');
-}
-
-function resolveParticipantSub(
-  participant: string,
-  myUsername: string,
-  mySub: string,
-  handleToSub: Map<string, string>,
-): string {
-  if (isCognitoUuid(participant)) return participant;
-
-  const value = participant.toLowerCase();
-  const handle = myUsername.toLowerCase();
-  const loginId = toLoginId(myUsername).toLowerCase();
-  if (
-    value === mySub.toLowerCase() ||
-    value === handle ||
-    value === loginId
-  ) {
-    return mySub;
-  }
-
-  const bareHandle = normalizeProfileHandle(participant);
-  if (bareHandle && handleToSub.has(bareHandle)) {
-    return handleToSub.get(bareHandle)!;
-  }
-
-  return participant;
 }
 
 export function resolveParticipantHandle(

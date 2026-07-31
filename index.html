@@ -9,7 +9,99 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <title>Private Messenger</title>
+    <!-- Critical shell layout: keeps list/chat panes working even if /assets/*.css 404s from a stale PWA cache. -->
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      #root { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+      .app-viewport {
+        box-sizing: border-box;
+        display: flex !important;
+        flex-direction: row !important;
+        flex: 1 1 auto;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .messenger-sidebar {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        width: 100%;
+        background: #111b21;
+        border-right: 1px solid rgba(0, 0, 0, 0.3);
+      }
+      .messenger-main {
+        box-sizing: border-box;
+        display: none;
+        flex: 1 1 auto;
+        flex-direction: column;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .messenger-main.is-chat-open { display: flex !important; }
+      @media (min-width: 768px) {
+        .messenger-sidebar,
+        .messenger-sidebar.is-chat-open {
+          display: flex !important;
+          width: 380px !important;
+          max-width: 380px !important;
+          flex: 0 0 380px !important;
+        }
+        .messenger-main,
+        .messenger-main.is-chat-open { display: flex !important; }
+      }
+      @media (max-width: 767px) {
+        .messenger-sidebar.is-chat-open { display: none !important; }
+      }
+    </style>
+    <!-- Runs before the app bundle: if deploy version changed, wipe SW caches and reload. -->
+    <script>
+      (function () {
+        var KEY = 'messenger:deploy-version';
+        var FLAG = 'messenger:version-reload';
+        fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })
+          .then(function (response) {
+            return response.ok ? response.json() : null;
+          })
+          .then(function (payload) {
+            if (!payload || !payload.version) return;
+            var remote = String(payload.version);
+            var previous = localStorage.getItem(KEY);
+            localStorage.setItem(KEY, remote);
+            if (!previous || previous === remote) return;
+            if (sessionStorage.getItem(FLAG) === remote) return;
+            sessionStorage.setItem(FLAG, remote);
+            var cleanup = Promise.resolve();
+            if ('serviceWorker' in navigator) {
+              cleanup = cleanup.then(function () {
+                return navigator.serviceWorker.getRegistrations().then(function (regs) {
+                  return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+                });
+              });
+            }
+            if ('caches' in window) {
+              cleanup = cleanup.then(function () {
+                return caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+                });
+              });
+            }
+            cleanup.finally(function () {
+              var url = new URL(location.href);
+              url.searchParams.set('v', Date.now().toString(36));
+              location.replace(url.toString());
+            });
+          })
+          .catch(function () {});
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

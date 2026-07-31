@@ -33,6 +33,7 @@ import {
 import { NoSaveField, NoSaveForm } from './NoSaveCredentials';
 
 import { APP_VERSION } from '../lib/app-version';
+import { purgeServiceWorkerCachesAndReload } from '../lib/pwa-update';
 
 
 
@@ -750,6 +751,15 @@ function AuthShell({
 
         <p className="mt-6 text-center text-xs text-[var(--color-muted)]">
           Version {APP_VERSION}
+        </p>
+        <p className="mt-2 text-center">
+          <button
+            type="button"
+            onClick={() => void purgeServiceWorkerCachesAndReload()}
+            className="text-xs text-[var(--color-accent)] hover:underline"
+          >
+            Clear cache &amp; reload
+          </button>
         </p>
 
       </div>

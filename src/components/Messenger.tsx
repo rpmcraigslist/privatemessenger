@@ -18,6 +18,8 @@ import { loadUserDirectory } from '../lib/directory';
 
 import { resolveCurrentUser, type SessionUser } from '../lib/session';
 
+import { useMediaQuery } from '../lib/use-media-query';
+
 import { loadServerReadState, installReadStateFlushHooks, onReadStateLoaded } from '../lib/read-state-sync';
 
 import {
@@ -527,6 +529,16 @@ export default function Messenger({ onSignOut }: Props) {
 
   useEffect(() => {
 
+    if (!user) return;
+
+    void refreshMessagesFromServer();
+
+  }, [refreshMessagesFromServer, user?.cognitoSub]);
+
+
+
+  useEffect(() => {
+
     if (!user || realtimeSyncEpoch === 0) return;
 
     void refreshMessagesFromServer();
@@ -1018,6 +1030,14 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+
+  const showSidebar = isDesktop || !selectedId;
+
+  const showMain = isDesktop || !!selectedId;
+
+
+
   if (bootError) {
 
     return (
@@ -1114,11 +1134,53 @@ export default function Messenger({ onSignOut }: Props) {
 
   return (
 
-    <div className="app-viewport bg-[var(--color-app-bg)]">
+    <div
+
+      className="app-viewport bg-[var(--color-app-bg)]"
+
+      style={{
+
+        display: 'flex',
+
+        flexDirection: 'row',
+
+        width: '100%',
+
+        height: '100%',
+
+        minHeight: 0,
+
+        overflow: 'hidden',
+
+      }}
+
+    >
 
       <aside
 
         className={`messenger-sidebar${selectedId ? ' is-chat-open' : ''}`}
+
+        style={{
+
+          display: showSidebar ? 'flex' : 'none',
+
+          flexDirection: 'column',
+
+          height: '100%',
+
+          minHeight: 0,
+
+          width: isDesktop ? 380 : '100%',
+
+          maxWidth: isDesktop ? 380 : undefined,
+
+          flex: isDesktop ? '0 0 380px' : '1 1 auto',
+
+          background: 'var(--color-panel)',
+
+          borderRight: '1px solid rgba(0, 0, 0, 0.3)',
+
+        }}
 
       >
 
@@ -1163,6 +1225,26 @@ export default function Messenger({ onSignOut }: Props) {
       <main
 
         className={`messenger-main${selectedId ? ' is-chat-open' : ''}`}
+
+        style={{
+
+          display: showMain ? 'flex' : 'none',
+
+          flexDirection: 'column',
+
+          flex: '1 1 auto',
+
+          height: '100%',
+
+          maxHeight: '100%',
+
+          minWidth: 0,
+
+          minHeight: 0,
+
+          overflow: 'hidden',
+
+        }}
 
       >
 

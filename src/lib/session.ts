@@ -131,7 +131,14 @@ export async function ensureValidSession(): Promise<boolean> {
     await resolveCurrentUser();
     return true;
   } catch (err) {
-    console.error('session validation failed', err);
+    const name =
+      err && typeof err === 'object' && 'name' in err
+        ? String((err as { name?: string }).name)
+        : '';
+    // Expected when the user is simply signed out — don't treat as a hard failure.
+    if (name !== 'UserUnAuthenticatedException') {
+      console.error('session validation failed', err);
+    }
     try {
       await signOutAndClear();
     } catch {

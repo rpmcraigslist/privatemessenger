@@ -4,11 +4,25 @@ customHeaders:
     headers:
       - key: Cache-Control
         value: 'no-cache, no-store, must-revalidate'
+      - key: Pragma
+        value: 'no-cache'
   - pattern: /
     headers:
       - key: Cache-Control
         value: 'no-cache, no-store, must-revalidate'
+      - key: Pragma
+        value: 'no-cache'
+  - pattern: /index.html
+    headers:
+      - key: Cache-Control
+        value: 'no-cache, no-store, must-revalidate'
+      - key: Pragma
+        value: 'no-cache'
   - pattern: /sw.js
+    headers:
+      - key: Cache-Control
+        value: 'no-cache, no-store, must-revalidate'
+  - pattern: /workbox-*.js
     headers:
       - key: Cache-Control
         value: 'no-cache, no-store, must-revalidate'
@@ -16,12 +30,18 @@ customHeaders:
     headers:
       - key: Cache-Control
         value: 'no-cache, no-store, must-revalidate'
+  - pattern: /version.json
+    headers:
+      - key: Cache-Control
+        value: 'no-cache, no-store, must-revalidate'
+      - key: Pragma
+        value: 'no-cache'
   - pattern: /amplify_outputs.json
     headers:
       - key: Cache-Control
         value: 'no-cache, no-store, must-revalidate'
-  # Fingerprinted Vite assets can be cached permanently.
+  # Fingerprinted Vite assets can be cached, but only briefly — SW uses SWR.
   - pattern: /assets/*
     headers:
       - key: Cache-Control
-        value: 'public, max-age=31536000, immutable'
+        value: 'public, max-age=3600, stale-while-revalidate=86400'

@@ -51,6 +51,8 @@ import BusyOverlay from './BusyOverlay';
 
 import MessageComposer from './MessageComposer';
 
+import MessageMarkdown from './MessageMarkdown';
+
 import Attachment from './Attachment';
 
 export type ChatBackHandle = {
@@ -1932,19 +1934,19 @@ function Bubble({
 
         {message.content && (
 
-          <p className="whitespace-pre-wrap break-words text-left">
+          searchQuery ? (
 
-            {searchQuery ? (
+            <p className="whitespace-pre-wrap break-words text-left">
 
               <HighlightedText text={message.content} query={searchQuery} />
 
-            ) : (
+            </p>
 
-              message.content
+          ) : (
 
-            )}
+            <MessageMarkdown content={message.content} />
 
-          </p>
+          )
 
         )}
 

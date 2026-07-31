@@ -19,6 +19,7 @@ import {
   messengerFromEmail,
   sendSesEmail,
 } from '../shared/ses-email';
+import { repairMessageParticipantAcl } from '../shared/message-acl';
 
 type Handler = Schema['sendMessageAlerts']['functionHandler'];
 type DataClient = ReturnType<typeof generateClient<Schema>>;
@@ -77,7 +78,7 @@ export const handler: Handler = async (event) => {
   }
 
   const client = await dataClientPromise;
-  const message = await loadMessage(client, messageId);
+  let message = await loadMessage(client, messageId);
   if (!message?.conversationId) {
     console.warn('sendMessageAlerts: message not found', messageId);
     return {
@@ -86,6 +87,14 @@ export const handler: Handler = async (event) => {
       skipped: 0,
       fromEmailConfigured: isMessengerFromEmailConfigured(),
     };
+  }
+
+  // Owner auth uses Cognito subs in participantUsernames. Repair from the
+  // conversation so recipients can receive the message in the live UI.
+  try {
+    message = await repairMessageParticipantAcl(client, message);
+  } catch (err) {
+    console.error('sendMessageAlerts: ACL repair failed', err);
   }
 
   const { senderUsername, participantUsernames, conversationId } = message;

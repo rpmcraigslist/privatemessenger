@@ -46,21 +46,38 @@ export function mergeConversationMessages(
 }
 
 /**
- * Apply a full global message snapshot from observeQuery after sync.
- * Keeps optimistic rows that are not yet present in the snapshot.
+ * Apply a server list snapshot without erasing messages that just arrived via
+ * subscription (AppSync list can lag a moment behind live create events).
  */
 export function applyGlobalMessageSnapshot(
   existing: MessageModel[],
   snapshot: MessageModel[],
   optimisticIds: ReadonlySet<string>,
   optimisticMessages: ReadonlyMap<string, MessageModel> = new Map(),
+  options: { retainNewerThanMs?: number; nowMs?: number } = {},
 ): MessageModel[] {
+  const retainNewerThanMs = options.retainNewerThanMs ?? 15_000;
+  const nowMs = options.nowMs ?? Date.now();
   const byId = new Map(snapshot.map((message) => [message.id, message]));
+
   for (const message of existing) {
-    if (!byId.has(message.id) && optimisticIds.has(message.id)) {
+    if (byId.has(message.id)) continue;
+    if (optimisticIds.has(message.id)) {
+      byId.set(message.id, message);
+      continue;
+    }
+    const createdMs = message.createdAt
+      ? new Date(message.createdAt).getTime()
+      : NaN;
+    if (
+      !Number.isNaN(createdMs) &&
+      nowMs - createdMs <= retainNewerThanMs
+    ) {
+      // Keep freshly subscribed messages until the next poll catches up.
       byId.set(message.id, message);
     }
   }
+
   for (const id of optimisticIds) {
     if (!byId.has(id) && optimisticMessages.has(id)) {
       byId.set(id, optimisticMessages.get(id)!);

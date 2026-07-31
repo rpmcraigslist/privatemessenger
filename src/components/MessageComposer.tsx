@@ -92,6 +92,23 @@ export default function MessageComposer({
         handleToSub,
       );
 
+      // Keep conversation ACL on Cognito subs so future messages stay visible to peers.
+      const conversationSubs = [
+        ...new Set(
+          conversation.participants.filter((p): p is string => !!p),
+        ),
+      ].sort();
+      const nextSubs = [...participantUsernames].sort();
+      if (
+        conversationSubs.length !== nextSubs.length ||
+        conversationSubs.some((value, index) => value !== nextSubs[index])
+      ) {
+        await client.models.Conversation.update({
+          id: conversation.id,
+          participants: participantUsernames,
+        });
+      }
+
       const { data: created, errors: createErrors } = await client.models.Message.create({
         conversationId: conversation.id,
         content: body || undefined,
@@ -247,7 +264,9 @@ export default function MessageComposer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           rows={3}
-          placeholder={replyTo ? 'Type your reply' : 'Type a message'}
+          placeholder={
+            replyTo ? 'Type your reply (markdown ok)' : 'Type a message (markdown ok)'
+          }
           className="max-h-40 min-h-[4.5rem] flex-1 resize-y rounded-2xl bg-[var(--color-panel-2)] px-4 py-2.5 text-[15px] leading-relaxed outline-none placeholder:text-[var(--color-muted)]"
         />
 

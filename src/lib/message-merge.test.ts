@@ -58,6 +58,20 @@ describe('message-merge', () => {
     expect(result.map((m) => m.id).sort()).toEqual(['1', 'opt-1']);
   });
 
+  it('applyGlobalMessageSnapshot keeps freshly subscribed messages missing from the poll', () => {
+    const now = Date.parse('2026-07-31T18:00:10.000Z');
+    const snapshot = [msg('1', 'c1', '2026-07-31T17:00:00.000Z')];
+    const fresh = msg('fresh', 'c1', '2026-07-31T18:00:05.000Z');
+    const result = applyGlobalMessageSnapshot(
+      [msg('1', 'c1'), fresh],
+      snapshot,
+      new Set(),
+      new Map(),
+      { nowMs: now, retainNewerThanMs: 15_000 },
+    );
+    expect(result.map((m) => m.id).sort()).toEqual(['1', 'fresh']);
+  });
+
   it('applyGlobalMessageSnapshot keeps pending optimistic sends not yet in local state', () => {
     const snapshot = [msg('1', 'c1')];
     const pending = msg('opt-1', 'c1');

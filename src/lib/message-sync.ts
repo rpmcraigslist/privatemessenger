@@ -80,6 +80,16 @@ export function processIncomingMessageAlerts(ctx: IncomingMessageAlertContext): 
 
     ctx.alertState.alertedMessageIds.add(message.id);
 
+    // Already looking at this chat — show the bubble, skip sound/OS toast.
+    if (
+      ctx.selectedConversationId &&
+      message.conversationId === ctx.selectedConversationId &&
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'visible'
+    ) {
+      continue;
+    }
+
     const conversation = ctx.conversations.get(message.conversationId);
     const title = conversation
       ? conversationTitle(

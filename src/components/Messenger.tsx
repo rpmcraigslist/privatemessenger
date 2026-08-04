@@ -29,6 +29,8 @@ import {
 
 import { computeUnreadCounts, totalUnreadCount } from '../lib/unread-counts';
 
+import { dedupeDirectConversations } from '../lib/conversation-dedupe';
+
 import {
 
   applyGlobalMessageSnapshot,
@@ -585,6 +587,68 @@ export default function Messenger({ onSignOut }: Props) {
 
 
 
+  const { conversations: dedupedConversations, aliasToCanonicalId } = useMemo(() => {
+    if (!user) {
+      return {
+        conversations: mergedConversations,
+        aliasToCanonicalId: new Map<string, string>(),
+      };
+    }
+    return dedupeDirectConversations(
+      mergedConversations,
+      user.username,
+      user.cognitoSub,
+      handleToSub,
+      allMessages,
+      latestByConversation,
+    );
+  }, [
+    allMessages,
+    handleToSub,
+    latestByConversation,
+    mergedConversations,
+    user,
+  ]);
+
+
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const canonical = aliasToCanonicalId.get(selectedId);
+    if (canonical && canonical !== selectedId) {
+      setSelectedId(canonical);
+    }
+  }, [aliasToCanonicalId, selectedId]);
+
+
+
+  useEffect(() => {
+    if (!user || dedupedConversations.length === mergedConversations.length) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, errors } = await client.mutations.mergeMyDuplicateDirectChats();
+        if (cancelled) return;
+        if (errors?.length) {
+          console.error('merge duplicate chats failed', errors);
+          return;
+        }
+        if ((data?.mergedGroups ?? 0) > 0) {
+          console.info('merged duplicate direct chats', data);
+        }
+      } catch (err) {
+        console.error('merge duplicate chats failed', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dedupedConversations.length, mergedConversations.length, user?.cognitoSub]);
+
+
+
   useEffect(() => {
 
     if (!user) return;
@@ -709,7 +773,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     () =>
 
-      [...mergedConversations].sort(
+      [...dedupedConversations].sort(
 
         (a, b) =>
 
@@ -719,7 +783,7 @@ export default function Messenger({ onSignOut }: Props) {
 
       ),
 
-    [mergedConversations, latestByConversation],
+    [dedupedConversations, latestByConversation],
 
   );
 
@@ -727,7 +791,7 @@ export default function Messenger({ onSignOut }: Props) {
 
   const unreadCounts = useMemo(() => {
 
-    if (!user || mergedConversations.length === 0) {
+    if (!user || dedupedConversations.length === 0) {
 
       return new Map<string, number>();
 
@@ -735,7 +799,7 @@ export default function Messenger({ onSignOut }: Props) {
 
     return computeUnreadCounts(
 
-      mergedConversations,
+      dedupedConversations,
 
       conversations,
 
@@ -759,9 +823,9 @@ export default function Messenger({ onSignOut }: Props) {
 
     conversations,
 
-    handleToSub,
+    dedupedConversations,
 
-    mergedConversations,
+    handleToSub,
 
     readRevision,
 
@@ -787,11 +851,13 @@ export default function Messenger({ onSignOut }: Props) {
 
     (conversationId: string) => {
 
-      setSelectedId(conversationId);
+      const canonical = aliasToCanonicalId.get(conversationId) ?? conversationId;
+
+      setSelectedId(canonical);
 
     },
 
-    [],
+    [aliasToCanonicalId],
 
   );
 
@@ -1002,9 +1068,9 @@ export default function Messenger({ onSignOut }: Props) {
 
   const selected = useMemo(
 
-    () => mergedConversations.find((c) => c.id === selectedId) ?? null,
+    () => dedupedConversations.find((c) => c.id === selectedId) ?? null,
 
-    [mergedConversations, selectedId],
+    [dedupedConversations, selectedId],
 
   );
 
@@ -1343,7 +1409,7 @@ export default function Messenger({ onSignOut }: Props) {
 
           handleToSub={handleToSub}
 
-          existing={mergedConversations}
+          existing={dedupedConversations}
 
           onClose={() => setShowNewChat(false)}
 

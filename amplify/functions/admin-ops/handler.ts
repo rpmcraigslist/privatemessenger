@@ -19,6 +19,7 @@ import {
 import {
   auditMessengerData,
   buildParticipantIdentityForHandle,
+  mergeDuplicateDirectChats,
   purgeDirectChatBetween,
   purgeUserMessengerData,
 } from '../shared/messenger-reconcile';
@@ -337,6 +338,22 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
     return listUserDirectory();
   }
 
+  if (field === 'mergeMyDuplicateDirectChats') {
+    const { username, sub } = await resolveCallerIdentity(event.identity);
+    if (!sub) throw new Error('Unauthorized');
+    const client = await dataClientPromise;
+    const users = await listUsers();
+    return mergeDuplicateDirectChats(
+      client,
+      users.map((user) => ({
+        loginId: user.loginId,
+        username: user.username,
+        cognitoSub: user.cognitoSub,
+      })),
+      { onlyInvolvingSub: sub },
+    );
+  }
+
   if (field === 'deleteMyMessage') {
     const messageId = event.arguments.messageId;
     if (!messageId) throw new Error('messageId is required');
@@ -450,6 +467,18 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         usernameB,
       );
     }
+    case 'adminMergeDuplicateDirectChats': {
+      const client = await dataClientPromise;
+      const users = await listUsers();
+      return mergeDuplicateDirectChats(
+        client,
+        users.map((user) => ({
+          loginId: user.loginId,
+          username: user.username,
+          cognitoSub: user.cognitoSub,
+        })),
+      );
+    }
     case 'adminCreateUser': {
       const { username, temporaryPassword, contactEmail, forcePasswordChange } =
         event.arguments;
@@ -488,9 +517,24 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
       }
 
       const cognitoUser = (await listUsers()).find((u) => u.username === handle);
+      let cognitoSub = cognitoUser?.cognitoSub ?? null;
+      // Cognito can lag briefly after AdminCreateUser — retry so chats use the real sub.
+      if (!cognitoSub) {
+        for (let attempt = 0; attempt < 5 && !cognitoSub; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          cognitoSub =
+            (await listUsers()).find((u) => u.username === handle)?.cognitoSub ??
+            null;
+        }
+      }
+      if (!cognitoSub) {
+        throw new Error(
+          `Created ${handle}, but Cognito sub was not ready yet. Ask them to sign in once, then start the chat.`,
+        );
+      }
       await ensureProfileForCognitoUser(client, {
         username: handle,
-        cognitoSub: cognitoUser?.cognitoSub ?? null,
+        cognitoSub,
         contactEmail: contactEmail?.trim() || null,
       });
 
@@ -498,8 +542,7 @@ export const handler: AppSyncResolverHandler<AdminEvent['arguments'], unknown> =
         username: handle,
         forcePasswordChange: forcePasswordChange !== false,
       };
-    }
-    case 'adminDeleteUser': {
+    }    case 'adminDeleteUser': {
       const username = event.arguments.username;
       if (!username) throw new Error('username is required');
       const handle = username.trim().toLowerCase();

@@ -29,6 +29,8 @@ export const REQUIRED_GRAPHQL_OPERATIONS = {
     'syncMyProfile',
     'deleteMyMessage',
     'editMyMessage',
+    'mergeMyDuplicateDirectChats',
+    'adminMergeDuplicateDirectChats',
     'adminDeleteUser',
     'adminPurgeDirectChat',
     'adminSendUserEmail',

@@ -391,6 +391,34 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
     }
   }
 
+  async function mergeDuplicateChats() {
+    if (
+      !confirm(
+        'Merge duplicate 1:1 chats? Messages move into the active thread; empty duplicates are removed.',
+      )
+    ) {
+      return;
+    }
+    setBusyLabel('Merging duplicate chats…');
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { data, errors } =
+        await client.mutations.adminMergeDuplicateDirectChats();
+      if (errors?.length) throw new Error(errors[0].message);
+      setMessage(
+        `Merged ${data?.mergedGroups ?? 0} duplicate pair(s). Moved ${data?.movedMessages ?? 0} message(s), removed ${data?.deletedConversations ?? 0} empty chat(s).`,
+      );
+      await loadAudit();
+      onDataRepaired?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Merge failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       {busy && <BusyOverlay label={busyLabel} />}
@@ -491,9 +519,20 @@ export default function AdminPanel({ onClose, onDataRepaired }: Props) {
                     </p>
                   )}
                   {audit.duplicateDirectChats.length > 0 ? (
-                    <p className="text-amber-300">
-                      Duplicate 1:1 chats: {audit.duplicateDirectChats.length} pair(s)
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-amber-300">
+                        Duplicate 1:1 chats: {audit.duplicateDirectChats.length}{' '}
+                        pair(s)
+                      </p>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void mergeDuplicateChats()}
+                        className="rounded-lg border border-[var(--color-accent)]/40 px-3 py-2 text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-40"
+                      >
+                        Merge duplicate chats (keep threads with messages)
+                      </button>
+                    </div>
                   ) : (
                     <p className="text-[var(--color-muted)]">
                       No duplicate 1:1 chats found.

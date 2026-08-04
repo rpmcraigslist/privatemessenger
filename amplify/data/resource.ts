@@ -158,6 +158,13 @@ const schema = a
       deletedConversations: a.integer().required(),
     }),
 
+    MergeDuplicateDirectChatsResult: a.customType({
+      mergedGroups: a.integer().required(),
+      deletedConversations: a.integer().required(),
+      movedMessages: a.integer().required(),
+      keeperConversationIds: a.string().array().required(),
+    }),
+
     AdminSendUserEmailResult: a.customType({
       sent: a.boolean().required(),
       username: a.string().required(),
@@ -306,6 +313,18 @@ const schema = a
         usernameB: a.string().required(),
       })
       .returns(a.ref('AdminPurgeDirectChatResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    mergeMyDuplicateDirectChats: a
+      .mutation()
+      .returns(a.ref('MergeDuplicateDirectChatsResult'))
+      .authorization((allow) => [allow.authenticated()])
+      .handler(a.handler.function(adminOps)),
+
+    adminMergeDuplicateDirectChats: a
+      .mutation()
+      .returns(a.ref('MergeDuplicateDirectChatsResult'))
       .authorization((allow) => [allow.authenticated()])
       .handler(a.handler.function(adminOps)),
 

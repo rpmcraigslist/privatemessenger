@@ -761,6 +761,15 @@
             "deletedConversations": { "name": "deletedConversations", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] }
           }
         },
+        "MergeDuplicateDirectChatsResult": {
+          "name": "MergeDuplicateDirectChatsResult",
+          "fields": {
+            "mergedGroups": { "name": "mergedGroups", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] },
+            "deletedConversations": { "name": "deletedConversations", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] },
+            "movedMessages": { "name": "movedMessages", "isArray": false, "type": "Int", "isRequired": true, "attributes": [] },
+            "keeperConversationIds": { "name": "keeperConversationIds", "isArray": true, "type": "String", "isRequired": true, "attributes": [], "isArrayNullable": false }
+          }
+        },
         "AdminSendUserEmailResult": {
           "name": "AdminSendUserEmailResult",
           "fields": {
@@ -989,6 +998,22 @@
               "isRequired": true
             }
           }
+        },
+        "mergeMyDuplicateDirectChats": {
+          "name": "mergeMyDuplicateDirectChats",
+          "isArray": false,
+          "type": {
+            "nonModel": "MergeDuplicateDirectChatsResult"
+          },
+          "isRequired": false
+        },
+        "adminMergeDuplicateDirectChats": {
+          "name": "adminMergeDuplicateDirectChats",
+          "isArray": false,
+          "type": {
+            "nonModel": "MergeDuplicateDirectChatsResult"
+          },
+          "isRequired": false
         },
         "adminSendUserEmail": {
           "name": "adminSendUserEmail",

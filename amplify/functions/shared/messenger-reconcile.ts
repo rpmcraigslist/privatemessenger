@@ -51,6 +51,13 @@ export type PurgeDirectChatResult = {
   deletedConversations: number;
 };
 
+export type MergeDuplicateDirectChatsResult = {
+  mergedGroups: number;
+  deletedConversations: number;
+  movedMessages: number;
+  keeperConversationIds: string[];
+};
+
 export type PurgeUserMessengerResult = {
   deletedMessages: number;
   deletedConversations: number;
@@ -340,6 +347,142 @@ export async function auditMessengerData(
     }),
     duplicateProfileHandles,
     duplicateDirectChats,
+  };
+}
+
+/**
+ * Merge duplicate 1:1 conversations that share a canonical peer key.
+ * Keeps the thread with the most messages (then most recent activity).
+ * Optionally limit to groups that include onlyInvolvingSub.
+ */
+export async function mergeDuplicateDirectChats(
+  client: DataClient,
+  cognitoUsers: CognitoDirectoryUser[],
+  options: { onlyInvolvingSub?: string | null } = {},
+): Promise<MergeDuplicateDirectChatsResult> {
+  const profiles = await listAllProfiles(client);
+  const conversations = await listAllConversations(client);
+  const messages = await listAllMessages(client);
+  const canonicalSubByParticipant = buildCanonicalSubMap(cognitoUsers, profiles);
+  const onlySub = options.onlyInvolvingSub?.trim() || null;
+
+  const messagesByConversation = new Map<string, Schema['Message']['type'][]>();
+  for (const message of messages) {
+    if (!message.conversationId) continue;
+    const bucket = messagesByConversation.get(message.conversationId) ?? [];
+    bucket.push(message);
+    messagesByConversation.set(message.conversationId, bucket);
+  }
+
+  const chatsByPeer = new Map<string, Conversation[]>();
+  for (const conversation of conversations) {
+    const key = directPeerKey(conversation, canonicalSubByParticipant);
+    if (!key) continue;
+    if (onlySub) {
+      const participants = (conversation.participants ?? []).filter(
+        (participant): participant is string => !!participant,
+      );
+      const involvesCaller = participants.some((participant) => {
+        const resolved = resolveCanonicalSub(participant, canonicalSubByParticipant);
+        return resolved === onlySub || participant === onlySub;
+      });
+      if (!involvesCaller) continue;
+    }
+    const bucket = chatsByPeer.get(key) ?? [];
+    bucket.push(conversation);
+    chatsByPeer.set(key, bucket);
+  }
+
+  let mergedGroups = 0;
+  let deletedConversations = 0;
+  let movedMessages = 0;
+  const keeperConversationIds: string[] = [];
+
+  for (const bucket of chatsByPeer.values()) {
+    if (bucket.length < 2) continue;
+    mergedGroups++;
+
+    const ranked = [...bucket].sort((a, b) => {
+      const countDiff =
+        (messagesByConversation.get(b.id)?.length ?? 0) -
+        (messagesByConversation.get(a.id)?.length ?? 0);
+      if (countDiff !== 0) return countDiff;
+      const timeDiff = conversationActivityAt(b) - conversationActivityAt(a);
+      if (timeDiff !== 0) return timeDiff;
+      return a.id.localeCompare(b.id);
+    });
+    const keeper = ranked[0]!;
+    const losers = ranked.slice(1);
+    keeperConversationIds.push(keeper.id);
+
+    const canonicalParticipants = [
+      ...new Set(
+        (keeper.participants ?? [])
+          .filter((participant): participant is string => !!participant)
+          .map((participant) =>
+            resolveCanonicalSub(participant, canonicalSubByParticipant),
+          ),
+      ),
+    ];
+
+    for (const loser of losers) {
+      const loserMessages = messagesByConversation.get(loser.id) ?? [];
+      for (const message of loserMessages) {
+        await client.models.Message.update(
+          {
+            id: message.id,
+            conversationId: keeper.id,
+            participantUsernames: canonicalParticipants,
+          },
+          { authMode: 'iam' },
+        );
+        movedMessages++;
+        const keeperBucket = messagesByConversation.get(keeper.id) ?? [];
+        keeperBucket.push({ ...message, conversationId: keeper.id });
+        messagesByConversation.set(keeper.id, keeperBucket);
+      }
+      messagesByConversation.set(loser.id, []);
+      await deleteConversationWithMessages(client, loser.id, messagesByConversation);
+      deletedConversations++;
+    }
+
+    const keeperMessages = messagesByConversation.get(keeper.id) ?? [];
+    let latest: Schema['Message']['type'] | null = null;
+    let latestMs = -1;
+    for (const message of keeperMessages) {
+      const createdAt = message.createdAt;
+      if (!createdAt) continue;
+      const ms = new Date(createdAt).getTime();
+      if (Number.isNaN(ms) || ms < latestMs) continue;
+      latestMs = ms;
+      latest = message;
+    }
+
+    const previewBody = latest?.content?.trim()
+      ? latest.content.trim().slice(0, 120)
+      : latest?.type === 'image'
+        ? '📷 Photo'
+        : latest?.attachmentName
+          ? `📎 ${latest.attachmentName}`.slice(0, 120)
+          : keeper.lastMessage ?? null;
+
+    await client.models.Conversation.update(
+      {
+        id: keeper.id,
+        participants: canonicalParticipants,
+        lastMessage: previewBody,
+        lastMessageAt:
+          latest?.createdAt ?? keeper.lastMessageAt ?? new Date().toISOString(),
+      },
+      { authMode: 'iam' },
+    );
+  }
+
+  return {
+    mergedGroups,
+    deletedConversations,
+    movedMessages,
+    keeperConversationIds,
   };
 }
 

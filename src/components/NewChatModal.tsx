@@ -4,11 +4,11 @@ import { client, type ConversationModel, type UserProfileModel } from '../lib/am
 import { loadUserDirectory } from '../lib/directory';
 import {
   displayName,
+  directConversationPeerKey,
   graphqlErrorMessage,
   isValidUsername,
   normalizeUsername,
   profileDisplayLabel,
-  repairParticipantSubs,
   usernameError,
 } from '../lib/util';
 
@@ -108,6 +108,16 @@ export default function NewChatModal({
     setSelected((s) => s.filter((e) => e !== name));
   }
 
+  const directoryHandleToSub = useMemo(() => {
+    const map = new Map(handleToSub);
+    for (const profile of directory) {
+      if (profile.cognitoSub) {
+        map.set(normalizeUsername(profile.username), profile.cognitoSub);
+      }
+    }
+    return map;
+  }, [directory, handleToSub]);
+
   async function start() {
     if (selected.length === 0 || busy) return;
     setBusy(true);
@@ -123,19 +133,21 @@ export default function NewChatModal({
       const participants = [mySub, ...selectedSubs];
 
       if (selected.length === 1) {
+        const targetKey = directConversationPeerKey(
+          { id: 'new', isGroup: false, participants: [mySub, selectedSubs[0]] },
+          myUsername,
+          mySub,
+          directoryHandleToSub,
+        );
         const match = existing.find((c) => {
           if (c.isGroup) return false;
-          const normalized = repairParticipantSubs(
-            c.participants.filter((p): p is string => !!p),
+          const key = directConversationPeerKey(
+            c,
             myUsername,
             mySub,
-            handleToSub,
+            directoryHandleToSub,
           );
-          return (
-            normalized.length === 2 &&
-            normalized.includes(mySub) &&
-            normalized.includes(selectedSubs[0])
-          );
+          return Boolean(targetKey && key && key === targetKey);
         });
         if (match) {
           onCreated(match.id, match);

@@ -11,6 +11,7 @@ import {
   markConversationReadForConversation,
   markConversationReadThrough,
   resolveReadScopeKey,
+  seedMissingReadCursors,
 } from './read-state';
 
 vi.mock('./read-state-sync', () => ({
@@ -131,6 +132,153 @@ describe('read-state', () => {
     expect(
       getLastReadAt('sub-a', 'alice', 'peer:sub-a:sub-b', 'conv-1'),
     ).toBe('2026-06-20T12:00:00.000Z');
+  });
+
+  it('seeds missing cursors from existing history without counting it unread', () => {
+    const conversation = {
+      id: 'conv-1',
+      isGroup: false,
+      participants: ['sub-1', 'sub-bob'],
+    };
+    const messages: MessageModel[] = [
+      {
+        id: '1',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['sub-1', 'sub-bob'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      } as MessageModel,
+      {
+        id: '2',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['sub-1', 'sub-bob'],
+        createdAt: '2026-06-20T13:00:00.000Z',
+        updatedAt: '2026-06-20T13:00:00.000Z',
+      } as MessageModel,
+    ];
+
+    expect(
+      countUnreadMessages(
+        messages,
+        getLastReadAtForConversation(
+          'sub-1',
+          'alice',
+          conversation,
+          'alice',
+          'sub-1',
+          new Map(),
+        ),
+        'alice',
+        'sub-1',
+        new Map(),
+        new Map(),
+      ),
+    ).toBe(2);
+
+    expect(
+      seedMissingReadCursors(
+        [conversation],
+        [conversation],
+        messages,
+        'sub-1',
+        'alice',
+        'alice',
+        'sub-1',
+        new Map(),
+      ),
+    ).toBe(true);
+
+    const cursor = getLastReadAtForConversation(
+      'sub-1',
+      'alice',
+      conversation,
+      'alice',
+      'sub-1',
+      new Map(),
+    );
+    expect(cursor).toBe('2026-06-20T13:00:00.000Z');
+    expect(
+      countUnreadMessages(
+        messages,
+        cursor,
+        'alice',
+        'sub-1',
+        new Map(),
+        new Map(),
+      ),
+    ).toBe(0);
+
+    expect(
+      seedMissingReadCursors(
+        [conversation],
+        [conversation],
+        messages,
+        'sub-1',
+        'alice',
+        'alice',
+        'sub-1',
+        new Map(),
+      ),
+    ).toBe(false);
+  });
+
+  it('does not hide messages that arrive after a seeded cursor', () => {
+    const conversation = {
+      id: 'conv-1',
+      isGroup: false,
+      participants: ['sub-1', 'sub-bob'],
+    };
+    const history: MessageModel[] = [
+      {
+        id: 'old',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['sub-1', 'sub-bob'],
+        createdAt: '2026-06-20T13:00:00.000Z',
+        updatedAt: '2026-06-20T13:00:00.000Z',
+      } as MessageModel,
+    ];
+    seedMissingReadCursors(
+      [conversation],
+      [conversation],
+      history,
+      'sub-1',
+      'alice',
+      'alice',
+      'sub-1',
+      new Map(),
+    );
+
+    const withNew: MessageModel[] = [
+      ...history,
+      {
+        id: 'new',
+        conversationId: 'conv-1',
+        senderUsername: 'bob',
+        participantUsernames: ['sub-1', 'sub-bob'],
+        createdAt: '2026-06-20T14:00:00.000Z',
+        updatedAt: '2026-06-20T14:00:00.000Z',
+      } as MessageModel,
+    ];
+    expect(
+      countUnreadMessages(
+        withNew,
+        getLastReadAtForConversation(
+          'sub-1',
+          'alice',
+          conversation,
+          'alice',
+          'sub-1',
+          new Map(),
+        ),
+        'alice',
+        'sub-1',
+        new Map(),
+        new Map(),
+      ),
+    ).toBe(1);
   });
 
   it('treats equal timestamps as read', () => {

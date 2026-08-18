@@ -477,6 +477,63 @@ export function messagesForReadScope(
   );
 }
 
+/**
+ * When a thread has messages but no stored read cursor, treat the current
+ * history as already seen. Otherwise a missing cursor (new device, cleared
+ * storage, pre-cursor chats) marks every old message as unread.
+ *
+ * Returns true if any cursor was written.
+ */
+export function seedMissingReadCursors(
+  conversations: readonly ConversationLike[],
+  allConversations: readonly ConversationLike[],
+  allMessages: readonly MessageModel[],
+  sub: string,
+  username: string,
+  myUsername: string,
+  mySub: string,
+  handleToSub: Map<string, string>,
+): boolean {
+  let changed = false;
+  for (const conversation of conversations) {
+    const stored = getLastReadAtForConversation(
+      sub,
+      username,
+      conversation,
+      myUsername,
+      mySub,
+      handleToSub,
+    );
+    if (stored) continue;
+
+    const scopedMessages = messagesForReadScope(
+      conversation,
+      allConversations,
+      allMessages,
+      myUsername,
+      mySub,
+      handleToSub,
+    );
+    const latest = latestMessageTimestamp(scopedMessages);
+    if (!latest) continue;
+
+    if (
+      markConversationReadForConversation(
+        sub,
+        username,
+        conversation,
+        myUsername,
+        mySub,
+        handleToSub,
+        latest,
+      )
+    ) {
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /** Best read-through timestamp for a thread using stored cursor and loaded messages. */
 export function effectiveLastReadAt(
   sub: string,

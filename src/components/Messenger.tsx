@@ -21,6 +21,7 @@ import { resolveCurrentUser, type SessionUser } from '../lib/session';
 import { useMediaQuery } from '../lib/use-media-query';
 
 import { loadServerReadState, installReadStateFlushHooks, onReadStateLoaded } from '../lib/read-state-sync';
+import { seedMissingReadCursors } from '../lib/read-state';
 
 import {
   consumePendingDeepLink,
@@ -205,6 +206,8 @@ export default function Messenger({ onSignOut }: Props) {
   const alertStateRef = useRef(createMessageAlertState());
 
   const pendingOptimisticMessagesRef = useRef(new Map<string, MessageModel>());
+
+  const historyReadSeededRef = useRef(false);
 
   const realtimeSyncEpoch = useRealtimeSyncEpoch();
 
@@ -657,7 +660,45 @@ export default function Messenger({ onSignOut }: Props) {
 
     pendingOptimisticMessagesRef.current.clear();
 
+    historyReadSeededRef.current = false;
+
   }, [user?.cognitoSub]);
+
+
+
+  useEffect(() => {
+    if (!user || !messagesSynced || historyReadSeededRef.current) return;
+    if (loading) return;
+
+    const expectingHistory = conversations.some(
+      (conversation) =>
+        Boolean(conversation.lastMessage) || Boolean(conversation.lastMessageAt),
+    );
+    if (expectingHistory && allMessages.length === 0) return;
+
+    historyReadSeededRef.current = true;
+    const changed = seedMissingReadCursors(
+      mergedConversations,
+      conversations,
+      allMessages,
+      user.cognitoSub,
+      user.username,
+      user.username,
+      user.cognitoSub,
+      handleToSub,
+    );
+    if (changed) {
+      setReadRevision((revision) => revision + 1);
+    }
+  }, [
+    allMessages,
+    conversations,
+    handleToSub,
+    loading,
+    mergedConversations,
+    messagesSynced,
+    user,
+  ]);
 
 
 

@@ -754,14 +754,18 @@ export default function ChatView({
         mySub,
         handleToSub,
       );
-      const firstUnread = findFirstUnreadMessage(
-        messages,
-        lastReadAt,
-        myUsername,
-        mySub,
-        subToUsername,
-        handleToSub,
-      );
+      // No cursor means history has not been classified yet — do not treat
+      // every old message as the first unread (that jumps to the top).
+      const firstUnread = lastReadAt
+        ? findFirstUnreadMessage(
+            messages,
+            lastReadAt,
+            myUsername,
+            mySub,
+            subToUsername,
+            handleToSub,
+          )
+        : null;
 
       if (firstUnread?.id) {
         positioned = scrollToMessage(firstUnread.id, {
